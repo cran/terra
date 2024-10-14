@@ -120,7 +120,7 @@ setMethod("plet", signature(x="SpatVector"),
 #type=type, breaks=breaks, breakby=breakby, sort=sort, decreasing=decreasing,
 		}
 		
-		if (missing(col)) col <- grDevices::rainbow
+		if (missing(col)) col <- \(n) grDevices::rainbow(n, start=.2)
 		alpha <- max(0, min(1, alpha))
 		fill <- max(0, min(1, fill))
 		x <- makelonlat(x)
@@ -309,6 +309,52 @@ setMethod("plet", signature(x="SpatVectorCollection"),
 )
 
 
+
+setMethod("polys", signature(x="leaflet"),
+	function(x, y, col, fill=0.2, lwd=2, border="black", alpha=1, popup=TRUE, label=FALSE, ...)  {
+
+		if (inherits(y, "SpatVector")) {
+			if (nrow(y) == 0) return(x)
+			y <- makelonlat(y)
+			if (missing(col)) col <- "black"
+			if (geomtype(y) != "polygons") {
+				error("polys", "SpatVector y must have polygons geometry")
+			}
+			leaflet::addPolygons(x, data=y, weight=lwd, fillColor=col, 
+					fillOpacity=fill, col=border, opacity=alpha, popup=popup, 
+					label=label, ...)			
+			
+		} else if (inherits(y, "SpatVectorCollection")) {
+			nms <- names(y)
+			n <- length(y)
+			nms[nchar(nms) == 0] <- "X"
+			nms <- make.unique(nms)
+			if (is.function(col)) {
+				cols <- col(n)
+			} else {
+				cols <- rep_len(col, n) 
+			}	
+			lwd <- rep_len(lwd, n) 
+			alpha <- rep_len(alpha, n) 
+			fill <- rep_len(fill, n) 
+			border <- rep_len(border, n) 
+			popup <- rep_len(popup, n) 
+			label <- rep_len(label, n) 
+
+			for (i in 1:length(nms)) {
+				x <- leaflet::addPolygons(x, data=y[i], weight=lwd[i], fillColor=cols[i], 
+					fillOpacity=fill[i], col=border[i], opacity=alpha[i], popup=popup[i], 
+					label=label[i], group=nms[i], ...)			
+			}
+			collapse=FALSE
+			leaflet::addLayersControl(x, overlayGroups = nms, options = leaflet::layersControlOptions(collapsed=collapse))
+		} else {
+			error("plet", "y should be a SpatVector or SpatVectorCollection")
+		}	
+	}
+)
+
+
 setMethod("lines", signature(x="leaflet"),
 	function(x, y, col, lwd=2, alpha=1, ...)  {
 		if (inherits(y, "SpatVector")) {
@@ -336,7 +382,9 @@ setMethod("lines", signature(x="leaflet"),
 			}
 			collapse=FALSE
 			leaflet::addLayersControl(x, overlayGroups = nms, options = leaflet::layersControlOptions(collapsed=collapse))
-		}
+		} else {
+			error("plet", "y should be a SpatVector or SpatVectorCollection")
+		}	
 	}
 )
 
@@ -420,11 +468,20 @@ setMethod("plet", signature(x="SpatRaster"),
 		wrap=TRUE, maxcell=500000, legend="bottomright", shared=FALSE, panel=FALSE, collapse=TRUE, map=NULL)  {
 
 		#checkLeafLetVersion()
+		
+		if (is.na(crs(x)) | (grepl("^Cartesian", .name_or_proj4(x)))) {
+			tiles <- ""
+			e <- ext(x)
+			rx <- diff(e[1:2])
+			ry <- diff(e[3:4])
+			m <- max(rx, ry)
+			ext(x) <- c(0, rx/m, 0, ry/m)
+			crs(x) <- "EPSG:3857"
+			notmerc <- FALSE
 
-		if (is.na(crs(x))) {
-			error("plet", "x must have a crs")
+		} else {
+			notmerc <- isTRUE(crs(x, describe=TRUE)$code != "3857")
 		}
-
 
 #		if (!is.null(add)) {
 #			if (inherits(add, "SpatVector")) {
@@ -466,7 +523,7 @@ setMethod("plet", signature(x="SpatRaster"),
 			tiles <- tiles[tiles!=""]
 			if (length(tiles) > 1) {
 				tiles <- tiles[1]
-				warn("plet", "only a single tileset can be used with raster data")
+				#warn("plet", "only a single tileset can be used with raster data")
 			}
 			map <- baselayers(tiles, wrap)
 		} else {
@@ -483,9 +540,8 @@ setMethod("plet", signature(x="SpatRaster"),
 		}
 
 
-		notmerc <- isTRUE(crs(x, describe=TRUE)$code != "3857")
 
-		if (nlyr(x) == 1) {
+		if (has.RGB(x) | nlyr(x) == 1) {
 			map <- leaflet::addRasterImage(map, x, colors=col, opacity=alpha, project=notmerc)
 			if (!is.null(legend)) {
 				if (!all(hasMinMax(x))) setMinMax(x)

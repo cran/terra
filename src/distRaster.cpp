@@ -648,8 +648,8 @@ SpatRaster SpatRaster::distance(double target, double exclude, bool keepNA, std:
 			nms = opt.names;
 		}
 		out.source.resize(nl);
-		for (unsigned i=0; i<nl; i++) {
-			std::vector<unsigned> lyr = {i};
+		for (size_t i=0; i<nl; i++) {
+			std::vector<size_t> lyr = {i};
 			SpatRaster r = subset(lyr, ops);
 			ops.names = {nms[i]};
 			r = r.distance(target, exclude, keepNA, unit, remove_zero, haversine, ops);
@@ -717,8 +717,8 @@ SpatRaster SpatRaster::direction(bool from, bool degrees, double target, double 
 		if (ops.names.size() == nms.size()) {
 			nms = opt.names;
 		}
-		for (unsigned i=0; i<nl; i++) {
-			std::vector<unsigned> lyr = {i};
+		for (size_t i=0; i<nl; i++) {
+			std::vector<size_t> lyr = {i};
 			SpatRaster r = subset(lyr, ops);
 			ops.names = {nms[i]};
 			r = r.direction(from, degrees, target, exclude, ops);
@@ -1500,10 +1500,10 @@ SpatRaster SpatRaster::costDistance(double target, double m, size_t maxiter, boo
 
 	SpatOptions ops(opt);
 	if (nlyr() > 1) {
-		std::vector<unsigned> lyr = {0};
+		std::vector<size_t> lyr = {0};
 		out = subset(lyr, ops);
 		out = out.costDistance(target, m, maxiter, grid, opt);
-		out.addWarning("cost distance computations are only done for the first input layer");
+		out.addWarning("distance computations are only done for the first input layer");
 		return out;
 	}
 
@@ -1537,7 +1537,7 @@ SpatRaster SpatRaster::costDistance(double target, double m, size_t maxiter, boo
 		out = out.writeRaster(opt);
 	}
 	if (i == maxiter) {
-		out.addWarning("costDistance did not converge");
+		out.addWarning("distance algorithm did not converge");
 	}
 	return(out);
 }
@@ -1848,8 +1848,8 @@ SpatRaster SpatRaster::gridDistance(double m, SpatOptions &opt) {
 	size_t nl = nlyr();
 	if (nl > 1) {
 		out.source.resize(nl);
-		for (unsigned i=0; i<nl; i++) {
-			std::vector<unsigned> lyr = {i};
+		for (size_t i=0; i<nl; i++) {
+			std::vector<size_t> lyr = {i};
 			SpatRaster r = subset(lyr, ops);
 			r = r.gridDistance(m, ops);
 			out.source[i] = r.source[0];
@@ -2099,7 +2099,7 @@ SpatRaster SpatRaster::edges(bool classes, std::string type, unsigned directions
 
 	SpatRaster out = geometry();
 	if (nlyr() > 1) {
-		std::vector<unsigned> lyr = {0};
+		std::vector<size_t> lyr = {0};
 		SpatOptions ops(opt);
 		out = subset(lyr, ops);
 		out = out.edges(classes, type, directions, falseval, opt);
@@ -2200,8 +2200,8 @@ SpatRaster SpatRaster::buffer(double d, double background, SpatOptions &opt) {
 			nms = opt.names;
 		}
 		out.source.resize(nl);
-		for (unsigned i=0; i<nl; i++) {
-			std::vector<unsigned> lyr = {i};
+		for (size_t i=0; i<nl; i++) {
+			std::vector<size_t> lyr = {i};
 			SpatRaster r = subset(lyr, ops);
 			ops.names = {nms[i]};
 			r = r.buffer(d, background, ops);
@@ -2386,7 +2386,9 @@ SpatVector SpatVector::point_buffer(std::vector<double> d, unsigned quadsegs, bo
 	SpatGeom g(polygons);
 	g.addPart(SpatPart(0, 0));
 
-	std::vector<std::vector<double>> xy = coordinates();
+//  not good for multipoints
+//	std::vector<std::vector<double>> xy = coordinates();
+	
 	if (is_lonlat()) {
 		std::vector<double> brng(n);
 		for (size_t i=0; i<n; i++) {
@@ -2398,103 +2400,114 @@ SpatVector SpatVector::point_buffer(std::vector<double> d, unsigned quadsegs, bo
 		geod_init(&gd, a, f);
 		double lat, lon, azi, s12, azi2;
 
-		// not checking for empty points
-		for (size_t i=0; i<npts; i++) {
-			if (std::isnan(xy[0][i] || std::isnan(xy[1][i]) || (xy[1][i]) > 90) || (xy[1][i] < -90)) {
-				out.addGeom(SpatGeom(polygons));
-			} else {
-				std::vector<double> ptx;
-				std::vector<double> pty;
-				geod_inverse(&gd, xy[1][i], xy[0][i],  90, xy[0][i], &s12, &azi, &azi2);
-				bool npole = s12 < d[i];
-				geod_inverse(&gd, xy[1][i], xy[0][i], -90, xy[0][i], &s12, &azi, &azi2);
-				bool spole = s12 < d[i];
-
-				if (npole && spole) {
-					ptx = std::vector<double> {-180,  0, 180, 180, 180,   0, -180, -180, -180};
-					pty = std::vector<double> {  90, 90,  90,   0, -90, -90,  -90,    0,   90};
-					g.reSetPart(SpatPart(ptx, pty));
-					out.addGeom(g);
-					//npole = false;
-					//spole = false;
+	// not checking for empty points
+		for (size_t p=0; p<npts; p++) { 
+			std::vector<std::vector<double>> xy = geoms[p].coordinates();
+			SpatVector tmp;
+			for (size_t i=0; i<xy[0].size(); i++) {
+				if (std::isnan(xy[0][i] || std::isnan(xy[1][i]) || (xy[1][i]) > 90) || (xy[1][i] < -90)) { 
+					tmp.addGeom(SpatGeom(polygons));
 				} else {
-					ptx.reserve(n);
-					pty.reserve(n);
-					if (wrap) {
-						for (size_t j=0; j < n; j++) {
-							geod_direct(&gd, xy[1][i], xy[0][i], brng[j], d[i], &lat, &lon, &azi);
-							ptx.push_back(lon);
-							pty.push_back(lat);
-						}
-					} else {
-						for (size_t j=0; j < n; j++) {
-							geod_direct(&gd, xy[1][i], 0, brng[j], d[i], &lat, &lon, &azi);
-							ptx.push_back(lon+xy[0][i]);
-							pty.push_back(lat);
-						}
-					}
-					if (npole) {
-						sort_unique_2d(ptx, pty);
-						if (ptx[ptx.size()-1] < 180) {
-							ptx.push_back(180);
-							pty.push_back(pty[pty.size()-1]);
-						}
-						ptx.push_back(180);
-						pty.push_back(90);
-						ptx.push_back(-180);
-						pty.push_back(90);
-						if (ptx[0] > -180) {
-							ptx.push_back(-180);
-							pty.push_back(pty[0]);
-						}
-						ptx.push_back(ptx[0]);
-						pty.push_back(pty[0]);
+					std::vector<double> ptx;
+					std::vector<double> pty;
+					geod_inverse(&gd, xy[1][i], xy[0][i],  90, xy[0][i], &s12, &azi, &azi2);
+					bool npole = s12 < d[p];
+					geod_inverse(&gd, xy[1][i], xy[0][i], -90, xy[0][i], &s12, &azi, &azi2);
+					bool spole = s12 < d[p];
+
+					if (npole && spole) {
+						ptx = std::vector<double> {-180,  0, 180, 180, 180,   0, -180, -180, -180};
+						pty = std::vector<double> {  90, 90,  90,   0, -90, -90,  -90,    0,   90};
 						g.reSetPart(SpatPart(ptx, pty));
-						out.addGeom(g);
-					} else if (spole) {
-						sort_unique_2d(ptx, pty);
-						if (ptx[ptx.size()-1] < 180) {
-							ptx.push_back(180);
-							pty.push_back(pty[pty.size()-1]);
-						}
-						ptx.push_back(180);
-						pty.push_back(-90);
-						ptx.push_back(-180);
-						pty.push_back(-90);
-						if (ptx[0] > -180) {
-							ptx.push_back(-180);
-							pty.push_back(pty[0]);
-						}
-						ptx.push_back(ptx[0]);
-						pty.push_back(pty[0]);
-						g.reSetPart(SpatPart(ptx, pty));
-						out.addGeom(g);
+						tmp.addGeom(g);
+						//npole = false;
+						//spole = false;
 					} else {
-						ptx.push_back(ptx[0]);
-						pty.push_back(pty[0]);
+						ptx.reserve(n);
+						pty.reserve(n);
 						if (wrap) {
-							bool split = false;
-							try {
-								split = fix_date_line(g, ptx, pty);
-							} catch(...) {}
-							
-							if (split & no_multipolygons) {
-								for (size_t j=0; j<g.parts.size(); j++) {
-									SpatGeom gg(g.parts[j], polygons);
-									out.addGeom(gg);
-								}
-							} else {
-								out.addGeom(g);
+							for (size_t j=0; j < n; j++) {
+								geod_direct(&gd, xy[1][i], xy[0][i], brng[j], d[p], &lat, &lon, &azi);
+								ptx.push_back(lon);
+								pty.push_back(lat);
 							}
 						} else {
+							for (size_t j=0; j < n; j++) {
+								geod_direct(&gd, xy[1][i], 0, brng[j], d[p], &lat, &lon, &azi);
+								ptx.push_back(lon+xy[0][i]);
+								pty.push_back(lat);
+							}
+						}
+						if (npole) {
+							sort_unique_2d(ptx, pty);
+							if (ptx[ptx.size()-1] < 180) {
+								ptx.push_back(180);
+								pty.push_back(pty[pty.size()-1]);
+							}
+							ptx.push_back(180);
+							pty.push_back(90);
+							ptx.push_back(-180);
+							pty.push_back(90);
+							if (ptx[0] > -180) {
+								ptx.push_back(-180);
+								pty.push_back(pty[0]);
+							}
+							ptx.push_back(ptx[0]);
+							pty.push_back(pty[0]);
 							g.reSetPart(SpatPart(ptx, pty));
-							out.addGeom(g);		
+							tmp.addGeom(g);
+						} else if (spole) {
+							sort_unique_2d(ptx, pty);
+							if (ptx[ptx.size()-1] < 180) {
+								ptx.push_back(180);
+								pty.push_back(pty[pty.size()-1]);
+							}
+							ptx.push_back(180);
+							pty.push_back(-90);
+							ptx.push_back(-180);
+							pty.push_back(-90);
+							if (ptx[0] > -180) {
+								ptx.push_back(-180);
+								pty.push_back(pty[0]);
+							}
+							ptx.push_back(ptx[0]);
+							pty.push_back(pty[0]);
+							g.reSetPart(SpatPart(ptx, pty));
+							tmp.addGeom(g);
+						} else {
+							ptx.push_back(ptx[0]);
+							pty.push_back(pty[0]);
+							if (wrap) {
+								bool split = false;
+								try {
+									split = fix_date_line(g, ptx, pty);
+								} catch(...) {}
+								
+								if (split & no_multipolygons) {
+									for (size_t j=0; j<g.parts.size(); j++) {
+										SpatGeom gg(g.parts[j], polygons);
+										tmp.addGeom(gg);
+									}
+								} else {
+									tmp.addGeom(g);
+								}
+							} else {
+								g.reSetPart(SpatPart(ptx, pty));
+								tmp.addGeom(g);		
+							}
 						}
 					}
 				}
 			}
+			if (tmp.size() > 1) {
+				tmp = tmp.aggregate(true);
+			}
+			out.addGeom(tmp.geoms[0]);
 		}
-	} else {
+		
+	} else { // not used (GEOS used for planar). Would need to be fixed for multipoints
+		std::vector<std::vector<double>> xy = coordinates();
+
 		std::vector<double> cosb(n);
 		std::vector<double> sinb(n);
 		std::vector<double> px(n+1);
@@ -2936,7 +2949,7 @@ SpatRaster SpatRaster::rst_area(bool mask, std::string unit, bool transform, int
 		SpatExtent extent = getExtent();
 		if ((out.ncol() == 1) && ((extent.xmax - extent.xmin) > 180)) {
 			disagg = true;
-			std::vector<unsigned> fact = {1,2};
+			std::vector<size_t> fact = {1,2};
 			out = out.disaggregate(fact, xopt);
 		}
 		SpatExtent e = {extent.xmin, extent.xmin+out.xres(), extent.ymin, extent.ymax};
@@ -2966,7 +2979,7 @@ SpatRaster SpatRaster::rst_area(bool mask, std::string unit, bool transform, int
 		out.writeStop();
 		if (disagg) {
 			SpatRaster tmp = out.to_memory_copy(xopt);
-			std::vector<unsigned> fact = {1,2};
+			std::vector<size_t> fact = {1,2};
 			opt.overwrite=true;
 			out = tmp.aggregate(fact, "sum", true, opt);
 		}
@@ -2982,7 +2995,7 @@ SpatRaster SpatRaster::rst_area(bool mask, std::string unit, bool transform, int
 			bool resample = false;
 //			SpatRaster empty = out.geometry(1);
 			size_t rcx = std::max(rcmax, 10);
-			unsigned frow = 1, fcol = 1;
+			size_t frow = 1, fcol = 1;
 			SpatRaster target = out.geometry(1);
 			if ((nrow() > rcx) || (ncol() > rcx)) {
 				resample = true;
@@ -3066,7 +3079,7 @@ std::vector<std::vector<double>> SpatRaster::sum_area(std::string unit, bool tra
 		SpatRaster x = geometry(1);
 		SpatExtent extent = x.getExtent();
 		if ((nc == 1) && ((extent.xmax - extent.xmin) > 180)) {
-			std::vector<unsigned> fact= {1,2};
+			std::vector<size_t> fact= {1,2};
 			x = x.disaggregate(fact, opt);
 		}
 		SpatExtent e = {extent.xmin, extent.xmin+x.xres(), extent.ymin, extent.ymax};
@@ -3263,7 +3276,7 @@ std::vector<std::vector<double>> SpatRaster::sum_area_group(SpatRaster group, st
 		SpatRaster x = geometry(1);
 		SpatExtent extent = x.getExtent();
 		if ((nc == 1) && ((extent.xmax - extent.xmin) > 180)) {
-			std::vector<unsigned> fact= {1,2};
+			std::vector<size_t> fact= {1,2};
 			x = x.disaggregate(fact, opt);
 		}
 		SpatExtent e = {extent.xmin, extent.xmin+x.xres(), extent.ymin, extent.ymax};

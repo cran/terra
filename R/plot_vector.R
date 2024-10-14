@@ -433,7 +433,7 @@ setMethod("dots", signature(x="SpatVector"),
 
 
 .prep.vect.data <- function(x, y, type=NULL, cols=NULL, mar=NULL, legend=TRUE,
-	legend.only=FALSE, levels=NULL, add=FALSE, range=NULL, breaks=NULL, breakby="eqint",
+	legend.only=FALSE, levels=NULL, add=FALSE, range=NULL, fill_range=FALSE, breaks=NULL, breakby="eqint",
 	xlim=NULL, ylim=NULL, colNA=NA, alpha=NULL, axes=TRUE, buffer=TRUE, background=NULL,
 	pax=list(), plg=list(), ext=NULL, grid=FALSE, las=0, sort=TRUE, decreasing=FALSE, values=NULL,
 	box=TRUE, xlab="", ylab="", cex.lab=0.8, line.lab=1.5, yaxs="i", xaxs="i", main="", cex.main=1.2, line.main=0.5, font.main=graphics::par()$font.main, col.main = graphics::par()$col.main, 
@@ -579,6 +579,7 @@ setMethod("dots", signature(x="SpatVector"),
 		}
 		out$range_set <- FALSE
 	}
+	out$fill_range <- fill_range
 	out$v <- v
 
 	if (!is.logical(sort)) {
@@ -749,6 +750,37 @@ setMethod("plot", signature(x="SpatVector", y="missing"),
 setMethod("plot", signature(x="SpatVectorProxy", y="missing"),
 	function(x, y, ...)  {
 		plot(ext(x), ...)
+	}
+)
+
+
+
+setMethod("plot", signature(x="SpatVectorCollection", y="missing"),
+	function(x, y, main, mar=NULL, nc, nr, maxnl=16, ...) {
+		nl <- max(1, min(length(x), maxnl))
+
+		if (nl==1) {
+			if (missing(main)) main = ""
+			out <- plot(x[1], main=main[1], mar=mar, ...)
+			return(invisible(out))
+		}
+
+		nrnc <- .get_nrnc(nr, nc, nl)
+		old.par <- graphics::par(no.readonly = TRUE)
+		on.exit(graphics::par(old.par))
+		if (is.null(mar)) {
+			mar=c(1.5, 1, 2.5, 3)
+		}
+		graphics::par(mfrow=nrnc)
+
+		if (missing("main")) {
+			main <- names(x)
+		} else {
+			main <- rep_len(main, nl)
+		}
+		for (i in 1:nl) {
+			plot(x[i], main=main[i], mar=mar, ...)
+		}
 	}
 )
 

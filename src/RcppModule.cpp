@@ -34,7 +34,7 @@ bool sameObject(SpatRaster* a, SpatRaster* b) {
 
 
 Rcpp::List getDataFrame(SpatDataFrame* v) {
-	unsigned n = v->ncol();
+	size_t n = v->ncol();
 	Rcpp::List out(n);
 	if (n == 0) {
 		return(out);
@@ -412,6 +412,7 @@ RCPP_MODULE(spat){
 		.method("deepcopy", &SpatVector::deepCopy)
 		.method("wkt", &SpatVector::wkt)
 		.method("wkb", &SpatVector::wkb)
+		.method("wkb_raw", &SpatVector::wkb_raw)
 		.method("hex", &SpatVector::hex)
 		.method("from_hex", &SpatVector::from_hex)
 		.method("make_nodes", &SpatVector::make_nodes)
@@ -506,6 +507,7 @@ RCPP_MODULE(spat){
 		.method("setGeometry", &SpatVector::setGeometry)
 		.method("setPointsXY", &SpatVector::setPointsGeometry)
 		.method("setPointsDF", &SpatVector::setPointsDF)
+		.method("setLinesStartEnd", &SpatVector::setLinesStartEnd)
 		.method("size", &SpatVector::size)
 		.method("subset_cols", ( SpatVector (SpatVector::*)(std::vector<int>))( &SpatVector::subset_cols ))
 		.method("subset_rows", ( SpatVector (SpatVector::*)(std::vector<int>))( &SpatVector::subset_rows ))
@@ -633,7 +635,7 @@ RCPP_MODULE(spat){
 	 // .constructor<std::string, int>()
 	    .constructor<std::vector<std::string>, std::vector<int>, std::vector<std::string>, bool, std::vector<std::string>, std::vector<std::string>, std::vector<size_t>>()
 		
-		.constructor<std::vector<unsigned>, std::vector<double>, std::string>()
+		.constructor<std::vector<size_t>, std::vector<double>, std::string>()
 		//.finalizer(&SpatRaster_finalizer)
 
 		//.method("fromFiles", &SpatRaster::fromFiles)
@@ -866,7 +868,7 @@ RCPP_MODULE(spat){
 		.method("clamp_raster", &SpatRaster::clamp_raster)
 		.method("clamp_ts", &SpatRaster::clamp_ts)
 		.method("replaceValues", &SpatRaster::replaceValues)
-		.method("classify", ( SpatRaster (SpatRaster::*)(std::vector<double>, unsigned, unsigned, bool, bool, double, bool, bool, bool, SpatOptions&) )( &SpatRaster::reclassify))
+		.method("classify", ( SpatRaster (SpatRaster::*)(std::vector<double>, size_t, unsigned, bool, bool, double, bool, bool, bool, SpatOptions&) )( &SpatRaster::reclassify))
 		//.method("source_collapse", &SpatRaster::collapse, "collapse")
 		.method("selRange", &SpatRaster::selRange)
 		.method("separate", &SpatRaster::separate)
@@ -940,6 +942,7 @@ RCPP_MODULE(spat){
 		.method("reverse", &SpatRaster::reverse)
 		.method("rotate", &SpatRaster::rotate)
 		//.method("sampleCells", &SpatRaster::sampleCells, "sampleCells")
+
 		.method("sampleRegularRaster", &SpatRaster::sampleRegularRaster)
 		.method("sampleRowColRaster", &SpatRaster::sampleRowColRaster)
 		.method("sampleRegularValues", &SpatRaster::sampleRegularValues)
@@ -957,6 +960,7 @@ RCPP_MODULE(spat){
 		.method("trig", &SpatRaster::trig)
 		.method("trim1", &SpatRaster::trim1)
 		.method("trim", &SpatRaster::trim2)
+
 		.method("unique", &SpatRaster::unique)
 		.method("where", &SpatRaster::where)
 		.method("sieve", &SpatRaster::sieveFilter)
@@ -975,6 +979,11 @@ RCPP_MODULE(spat){
 		.method("zonal_poly_table", &SpatRaster::zonal_poly_table)		
 		.method("zonal_poly_weighted", &SpatRaster::zonal_poly_weighted)		
 //		.method("zonal_old", &SpatRaster::zonal_old)
+    .method("watershed2", &SpatRaster::watershed2, "watershed2") //EC 20210311 // EC 20210702
+    .method("pitfinder2", &SpatRaster::pitfinder2, "pitfinder2") //EC 20220810 // EC 20220810	
+    .method("NIDP2", &SpatRaster::NIDP2, "NIDP2") //EC 20231031
+    .method("flowAccu2", &SpatRaster::flowAccu2) //, "flowAccu2") //EC 20231031
+    .method("flowAccu2_weight", &SpatRaster::flowAccu2_weight) //, "flowAccu2_weight") //EC 20231114
 	;
 
     class_<SpatRasterCollection>("SpatRasterCollection")

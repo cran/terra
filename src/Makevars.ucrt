@@ -9,7 +9,6 @@ endif
 
 CXX_STD = CXX
 
-
 all: clean winlibs
 
 winlibs:

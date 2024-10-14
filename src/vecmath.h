@@ -501,17 +501,24 @@ T vall(const std::vector<T>& v, bool narm) {
 template <typename T>
 T vany(const std::vector<T>& v, bool narm) {
 	T x = NA<T>::value;
-	for (size_t i=0; i<v.size(); i++) {
-		if (!is_NA(v[i])) {
-			if (v[i] != 0) {
-				x = 1;
-				break;
-			} else {
-				x = 0;				
+	x = 0;
+	if (narm) {
+		for (size_t i=0; i<v.size(); i++) {
+			if (!is_NA(v[i])) {
+				if (v[i] != 0) {
+					x = 1;
+					break;
+				} 
 			}
-		} else if (!narm) {
-			x = NA<T>::value;
-			break;
+		}
+	} else {
+		for (size_t i=0; i<v.size(); i++) {
+			if (is_NA(v[i])) {
+				x = NA<T>::value;
+				break;				
+			} else if (v[i] != 0) {
+				x = 1;
+			}
 		}
 	}
 	return x;
@@ -646,6 +653,25 @@ std::vector<bool> visnotna(const std::vector<T>& v) {
 }
 
 
+template <typename T>
+bool vany_notna(const std::vector<T>& v) {
+	for (size_t i=0; i<v.size(); i++) {
+		if (!is_NA(v[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+
+template <typename T>
+bool vany_na(const std::vector<T>& v) {
+	for (size_t i=0; i<v.size(); i++) {
+		if (is_NA(v[i])) {
+			return true;
+		}
+	}
+	return false;
+}
 
 
 template <typename T>
@@ -748,6 +774,40 @@ std::vector<size_t> order(const std::vector<T> &v) {
 */
 
 
+template <typename T>
+double expH(std::vector<T> d, bool narm) {
+  
+	std::unordered_map<T, unsigned int> counts;
+	double s = 0;
+	if (narm) {
+		for (int v : d) {
+			if (!is_NA(v)) {
+				counts[v]++;
+				s++;
+			}
+		}
+	} else {
+		for (int v : d) {
+			if (is_NA(v)) {
+				return NAN;
+			} else {
+				counts[v]++;
+				s++;
+			}
+		}
+	}
+	if (s == 0) {
+		return NAN;
+	} 
+
+	double sump = 0;
+	for (auto const& pair : counts) { 
+		double p = pair.second / s;
+		sump += p * log(p);
+	}
+  
+	return exp(-sump);
+}
 
 #endif
 

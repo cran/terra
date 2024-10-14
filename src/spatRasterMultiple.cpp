@@ -261,6 +261,36 @@ void SpatRasterStack::set_units(std::vector<std::string> u) {
 		units = u;
 	}
 }
+
+void SpatRasterStack::set_layernames(std::vector<std::string> nms, long id) {
+	if (id < 0) {
+		for (size_t i=0; i<ds.size(); i++) {
+			if (ds[i].nlyr() != nms.size()) {
+				setError("length of names does not match the number of layers");
+			} else {
+				ds[i].setNames(nms);
+			}
+		}
+	} else {
+		if (ds[id].nlyr() != nms.size()) {
+			setError("length of names does not match the number of layers");
+		} else {
+			ds[id].setNames(nms);
+		}
+	}
+}
+
+std::vector<std::vector<std::string>> SpatRasterStack::get_layernames() {
+	size_t nd = ds.size();
+	std::vector<std::vector<std::string>> out(nd);
+	for (size_t i = 0; i<nd; i++) {
+		out[i] = ds[i].getNames();
+	}		
+	return out;
+}
+
+
+
 std::vector<std::string> SpatRasterStack::filenames() {
 	size_t n =0;
 	for (size_t i=0; i<ds.size(); i++) { 
@@ -407,7 +437,7 @@ SpatRasterStack SpatRasterStack::crop(SpatExtent e, std::string snap, bool expan
 	return out;
 }
 
-void SpatRasterStack::replace(unsigned i, SpatRaster x) {
+void SpatRasterStack::replace(unsigned i, SpatRaster x, bool setname) {
 	if (i > (ds.size()-1)) {
 		setError("invalid index");
 		return;				
@@ -422,9 +452,12 @@ void SpatRasterStack::replace(unsigned i, SpatRaster x) {
 	}
 	
 	ds[i] = x;
-	names[i] = x.getNames()[0];
-	long_names[i] = x.getLongSourceNames()[0];
-	units[i] = x.getUnit()[0];
+//  for clause for #1604
+	if (setname) {
+		names[i] = x.getNames()[0];
+		long_names[i] = x.getLongSourceNames()[0];
+		units[i] = x.getUnit()[0];
+	}
 }
 
 SpatRaster SpatRasterStack::collapse() {

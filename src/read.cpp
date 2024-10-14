@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with spat. If not, see <http://www.gnu.org/licenses/>.
 
-#include "spatRaster.h"
+#include "spatRasterMultiple.h"
 
 bool SpatRaster::readStart() {
 
@@ -60,7 +60,7 @@ bool SpatRaster::readStop() {
 
 
 // 2D BSQ
-void SpatRaster::readBlock2(std::vector<std::vector<double>> &v, BlockSize bs, unsigned i) {
+void SpatRaster::readBlock2(std::vector<std::vector<double>> &v, BlockSize bs, size_t i) {
 	std::vector<double> x;
 	readValues(x, bs.row[i], bs.nrows[i], 0, ncol());
 	v.resize(nlyr());
@@ -71,7 +71,7 @@ void SpatRaster::readBlock2(std::vector<std::vector<double>> &v, BlockSize bs, u
 }
 
 // BIP
-void SpatRaster::readBlockIP(std::vector<double> &x, BlockSize bs, unsigned i) {
+void SpatRaster::readBlockIP(std::vector<double> &x, BlockSize bs, size_t i) {
 	readValues(x, bs.row[i], bs.nrows[i], 0, ncol());
 	std::vector<double> v(x.size());
 	size_t off = bs.nrows[i] * ncol();
@@ -358,7 +358,7 @@ std::vector<double> SpatRaster::getValues(long lyr, SpatOptions &opt) {
 			}
 		}
 	} else { // read one lyr
-		std::vector<unsigned> sl = findLyr(lyr);
+		std::vector<size_t> sl = findLyr(lyr);
 		unsigned src=sl[0];
 		if (source[src].memory) {
 			size_t start = sl[1] * ncell();
@@ -405,4 +405,31 @@ bool SpatRaster::getValuesSource(size_t src, std::vector<double> &out) {
 	}
 	return true;
 }
+
+
+SpatRasterStack SpatRasterCollection::read_into(SpatRaster &tmp, size_t row, size_t nrows) {
+
+	size_t n = size();
+	double nan = NAN;
+	std::vector<double> v(nan, nrows * tmp.ncol() * n);
+	SpatRasterStack out;
+
+	SpatExtent e = tmp.getExtent();
+	e.ymax = tmp.source[0].extent.ymax - row * tmp.yres(); 	
+	e.ymin = tmp.source[0].extent.ymax - (row + nrows) * tmp.yres(); 
+	SpatOptions ops;
+	for (size_t i=0; i<n; i++) {
+		SpatExtent ee = ds[i].getExtent();
+		if ((ee.ymax > e.ymin) & (ee.ymin < e.ymax)) {
+			if (!tmp.compare_geom(ds[i], false, false, ops.get_tolerance(), false, false, false, true)) {
+				out.setError(tmp.msg.error);
+				return(out);
+			}
+			SpatRaster x = ds[i].crop(e, "near", true, ops);
+			out.ds.push_back(x);
+		}
+	}
+	return out;
+}
+
 

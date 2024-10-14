@@ -1239,3 +1239,25 @@ setMethod("sort", signature(x="data.frame"),
 		x[i, ]
 	}
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

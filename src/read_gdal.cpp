@@ -882,6 +882,9 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 		} else {
 			addWarning("unknown extent");
 		}
+		try {
+			s.flipped = adfGeoTransform[5] > 0;
+		} catch(...) {}
 	}
 
 	s.memory = false;
@@ -950,11 +953,13 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 
 	int bs1, bs2;
 	for (size_t i = 0; i < s.nlyr; i++) {
+		
 		poBand = poDataset->GetRasterBand(i+1);
 
 		if ((gdrv=="netCDF") || (gdrv == "HDF5") || (gdrv == "GRIB") || (gdrv == "GTiff")) {
 			char **m = poBand->GetMetadata();
 			while (m != nullptr && *m != nullptr) {
+
 				bandmeta[i].push_back(*m++);
 			}
 			char **meterra = poBand->GetMetadata("LYR_TAGS");
@@ -1100,6 +1105,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 
 	msg = "";
 	if ((gdrv=="netCDF") || (gdrv == "HDF5"))  {
+		
 		std::vector<std::string> metadata;
 		char **m = poDataset->GetMetadata();
 		if (m) {
@@ -1108,7 +1114,9 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 			}
 		}
 		s.set_names_time_ncdf(metadata, bandmeta, msg);
+
 		if (s.srs.is_empty()) {
+
 			bool lat = false;
 			bool lon = false;
 			for (size_t i=0; i<metadata.size(); i++) {
@@ -1144,7 +1152,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 }
 
 
-bool SpatRaster::readStartGDAL(unsigned src) {
+bool SpatRaster::readStartGDAL(size_t src) {
 
     GDALDataset *poDataset = openGDAL(source[src].filename, GDAL_OF_RASTER | GDAL_OF_READONLY, source[src].open_drivers, source[src].open_ops);
 
@@ -1162,7 +1170,7 @@ bool SpatRaster::readStartGDAL(unsigned src) {
 	return(true);
 }
 
-bool SpatRaster::readStopGDAL(unsigned src) {
+bool SpatRaster::readStopGDAL(size_t src) {
 	if (source[src].gdalconnection != NULL) {
 		GDALClose( (GDALDatasetH) source[src].gdalconnection);
 	}
@@ -1220,7 +1228,7 @@ void vflip(std::vector<double> &v, const size_t &ncell, const size_t &nrows, con
 }
 
 
-void SpatRaster::readChunkGDAL(std::vector<double> &data, unsigned src, size_t row, unsigned nrows, size_t col, unsigned ncols) {
+void SpatRaster::readChunkGDAL(std::vector<double> &data, size_t src, size_t row, size_t nrows, size_t col, size_t ncols) {
 
 	if (source[src].flipped) {
 		row = nrow() - row - nrows;
@@ -1247,8 +1255,8 @@ void SpatRaster::readChunkGDAL(std::vector<double> &data, unsigned src, size_t r
 		return;
 	}
 
-	unsigned ncell = ncols * nrows;
-	unsigned nl = source[src].nlyr;
+	size_t ncell = ncols * nrows;
+	size_t nl = source[src].nlyr;
 	std::vector<double> out(ncell * nl);
 	int hasNA;
 	std::vector<double> naflags(nl, NAN);
@@ -1306,7 +1314,7 @@ void SpatRaster::readChunkGDAL(std::vector<double> &data, unsigned src, size_t r
 
 
 
-std::vector<double> SpatRaster::readValuesGDAL(unsigned src, size_t row, size_t nrows, size_t col, size_t ncols, int lyr) {
+std::vector<double> SpatRaster::readValuesGDAL(size_t src, size_t row, size_t nrows, size_t col, size_t ncols, int lyr) {
 
 	std::vector<double> errout;
 	if (source[src].rotated) {
@@ -1384,7 +1392,7 @@ std::vector<double> SpatRaster::readValuesGDAL(unsigned src, size_t row, size_t 
 
 
 
-std::vector<double> SpatRaster::readGDALsample(unsigned src, size_t srows, size_t scols) {
+std::vector<double> SpatRaster::readGDALsample(size_t src, size_t srows, size_t scols) {
 
 	std::vector<double> errout;
 	if (source[src].rotated) {
@@ -1419,8 +1427,8 @@ std::vector<double> SpatRaster::readGDALsample(unsigned src, size_t srows, size_
 		return errout;
 	}
 
-	unsigned ncell = scols * srows;
-	unsigned nl = source[src].nlyr;
+	size_t ncell = scols * srows;
+	size_t nl = source[src].nlyr;
 	std::vector<double> out(ncell*nl);
 	int hasNA;
 	CPLErr err = CE_None;
@@ -1486,7 +1494,7 @@ std::vector<double> SpatRaster::readGDALsample(unsigned src, size_t srows, size_
 
 
 
-std::vector<std::vector<double>> SpatRaster::readRowColGDAL(unsigned src, std::vector<int_64> &rows, const std::vector<int_64> &cols) {
+std::vector<std::vector<double>> SpatRaster::readRowColGDAL(size_t src, std::vector<int_64> &rows, const std::vector<int_64> &cols) {
 
 	std::vector<std::vector<double>> errout;
 	if (source[src].rotated) {
@@ -1507,9 +1515,9 @@ std::vector<std::vector<double>> SpatRaster::readRowColGDAL(unsigned src, std::v
 
 	GDALRasterBand *poBand;
 
-	std::vector<unsigned> lyrs = source[src].layers;
-	unsigned nl = lyrs.size();
-	unsigned n = rows.size();
+	std::vector<size_t> lyrs = source[src].layers;
+	size_t nl = lyrs.size();
+	size_t n = rows.size();
 
 	size_t fnr = nrow() - 1;
 	if (source[src].flipped) {
@@ -1572,7 +1580,7 @@ std::vector<std::vector<double>> SpatRaster::readRowColGDAL(unsigned src, std::v
 
 
 
-std::vector<double> SpatRaster::readRowColGDALFlat(unsigned src, std::vector<int_64> &rows, const std::vector<int_64> &cols) {
+std::vector<double> SpatRaster::readRowColGDALFlat(size_t src, std::vector<int_64> &rows, const std::vector<int_64> &cols) {
 
 	std::vector<double> errout;
 	if (source[src].rotated) {
@@ -1593,9 +1601,9 @@ std::vector<double> SpatRaster::readRowColGDALFlat(unsigned src, std::vector<int
 
 	GDALRasterBand *poBand;
 
-	std::vector<unsigned> lyrs = source[src].layers;
-	unsigned nl = lyrs.size();
-	unsigned n = rows.size();
+	std::vector<size_t> lyrs = source[src].layers;
+	size_t nl = lyrs.size();
+	size_t n = rows.size();
 
 	size_t fnr = nrow() - 1;
 	if (source[src].flipped) {
@@ -1877,6 +1885,7 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 	std::vector<double> raw;
 	raw.reserve(vals.size());
 	for (size_t i=0; i<vals.size(); i++) {
+		
 		double dval;
 		if (get_double(vals[i], dval)) {
 			raw.push_back(dval);
@@ -1891,6 +1900,7 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 	std::string origin;
 	std::string calendar = "standard";
 	for (size_t i=0; i<metadata.size(); i++) {
+
 		if (!fc) {
 			std::string pattern = "time#calendar=";
 			std::size_t found = metadata[i].find(pattern);
@@ -1955,8 +1965,10 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 			}
 		}
 	}
+
 	SpatTime_t offset = 0;
 	if (foundorigin) {
+
 		step = "seconds";
 		out.reserve(raw.size());
 		std::string cal = "366";
@@ -1966,11 +1978,11 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 			cal = "365";		
 		} else if (calendar =="gregorian" || calendar =="proleptic_gregorian" || calendar=="standard" || calendar == "julian") {
 			cal = "366";
-		} else {
+		} else if (!(months || years || yearmonths || yearsbp)) {
 			//cal = "366";
 			msg = "unknown calendar (assuming standard): " + calendar;			
 		}
-		
+
 		// this shortcut means that 360/noleap calendars loose only have dates, no time
 		// to be refined
 		if ((hours || minutes || seconds) && (cal == "360")) {
@@ -1994,7 +2006,7 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 			}
 			days = true;
 		} 
-		
+	
 		if (days) {
 			step = "days";
 			std::vector<int> ymd = getymd(origin);
@@ -2021,7 +2033,6 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 		} else if (minutes) {
 			if (cal == "365") {
 				std::vector<int> ymd = getymd(origin);
-//				Rcpp::Rcout << origin << std::endl;
 				for (size_t i=0; i<raw.size(); i++) out.push_back(
 						get_time_noleap(ymd[0], ymd[1], ymd[2], ymd[3], ymd[4], 0, raw[i], "minutes")
 					);
@@ -2057,7 +2068,12 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 			}
 		} else if (months) {
 			step = "months";
-			for (size_t i=0; i<raw.size(); i++) out.push_back(get_time(1970, raw[i], 15, 0, 0, 0));
+			// check for 0..11 range
+			int zero = vmin(raw, true) == 0.0;
+			for (size_t i=0; i<raw.size(); i++) {
+				unsigned m = std::ceil(raw[i] + zero);
+				out.push_back(get_time(1970, m, 15, 0, 0, 0));
+			}
 		} else {
 			step = "raw";
 			for (size_t i=0; i<raw.size(); i++) out.push_back(raw[i]);
@@ -2149,11 +2165,16 @@ void SpatRasterSource::set_names_time_ncdf(std::vector<std::string> metadata, st
 	recycle(unit, nlyr);
 	if (!nms[0].empty()) {
 		std::string step;
-		std::vector<int_64> x = ncdf_time(metadata, nms[0], step, msg);
-		if (x.size() == nlyr) {
-			time = x;
-			timestep = step;
-			hasTime = true;
+		std::vector<int_64> x;
+		try {
+			x = ncdf_time(metadata, nms[0], step, msg);
+			if (x.size() == nlyr) {
+				time = x;
+				timestep = step;
+				hasTime = true;
+			}
+		} catch(...) {
+			msg = "could not extract time scale";
 		}
 	}
 }

@@ -24,7 +24,6 @@
 #include "gdal_priv.h"
 #endif
 
-
 enum SpatGeomType { points, lines, polygons, null};
 
 
@@ -189,6 +188,7 @@ class SpatVector {
 		void setGeometry(std::string type, std::vector<unsigned> gid, std::vector<unsigned> part, std::vector<double> x, std::vector<double> y, std::vector<unsigned> hole);
 		void setPointsGeometry(std::vector<double> &x, std::vector<double> &y);
 		void setPointsDF(SpatDataFrame &x, std::vector<unsigned> geo, std::string crs, bool keepgeom);
+		void setLinesStartEnd(std::vector<double> &x, std::string crs);
 
 		std::vector<double> area(std::string unit, bool transform, std::vector<double> mask);
 
@@ -313,6 +313,8 @@ class SpatVector {
 		std::vector<std::string> wkt();
 		std::vector<std::string> wkb();
 		std::vector<std::string> hex();
+		std::vector<std::vector<unsigned char>> wkb_raw(); 
+		
 		SpatVector from_hex(std::vector<std::string> x, std::string srs);
 		SpatVector make_nodes();
 		SpatVector polygonize();

@@ -178,7 +178,7 @@ setReplaceMethod("[", c("SpatRasterDataset", "numeric", "missing"),
 			if (j == (length(x)+1)) {
 				x@ptr$add(value@ptr, "", "", "", FALSE)
 			} else {
-				x@ptr$replace(j-1, value@ptr)
+				x@ptr$replace(j-1, value@ptr, FALSE)
 			}
 		}
 		messages(x, "`[`")
@@ -269,6 +269,12 @@ function(x, i, j, drop=TRUE) {
 })
 
 
+setMethod("$", c("SpatRasterDataset"),
+function(x, name) {
+	x[name,drop=TRUE]
+})
+
+
 setMethod("$", "SpatRasterDataset",
 	function(x, name) {
 		x[name]
@@ -311,9 +317,10 @@ setMethod("sprc", signature(x="list"),
 				}
 			}
 		}
-		x <- new("SpatRasterCollection")
-		x@ptr <- ptr
-		x
+		r <- new("SpatRasterCollection")
+		r@ptr <- ptr
+		if (length(r) == length(x)) names(r) <- names(x)
+		r
 	}
 )
 
