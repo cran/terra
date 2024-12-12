@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2023  Robert J. Hijmans
+// Copyright (c) 2018-2025  Robert J. Hijmans
 //
 // This file is part of the "spat" library.
 //
@@ -21,6 +21,7 @@
 #include "math_utils.h"
 #include "vecmath.h"
 #include "recycle.h"
+#include <unordered_map>
 
 #ifdef useGDAL
 	#include "crs.h"
@@ -918,6 +919,7 @@ SpatVector SpatVector::subset_rows(std::vector<int> range) {
 	SpatVector out;
 	int n = nrow();
 	std::vector<unsigned> r;
+	r.reserve(range.size());
 	for (size_t i=0; i<range.size(); i++) {
 		if ((range[i] >= 0) && (range[i] < n)) {
 			r.push_back(range[i]);

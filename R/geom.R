@@ -318,7 +318,6 @@ setMethod("buffer", signature(x="SpatVector"),
 )
 
 
-
 setMethod("crop", signature(x="SpatVector", y="ANY"),
 	function(x, y, ext=FALSE) {
 		if (ext) {
@@ -338,12 +337,17 @@ setMethod("crop", signature(x="SpatVector", y="ANY"),
 			## crop_ext does not include points on the borders
 			## https://github.com/rspatial/raster/issues/283
 			#x@ptr <- x@ptr$crop_ext(y@ptr)
-			y <- as.polygons(y)
-			x@ptr <- x@ptr$crop_vct(y@ptr)
+			if (geomtype(x) == "points") {
+				y <- as.polygons(y)
+				x@ptr <- x@ptr$crop_vct(y@ptr)
+			} else {
+				x@ptr <- x@ptr$crop_ext(y@ptr, TRUE)
+			}
 		}
 		messages(x, "crop")
 	}
 )
+
 
 
 setMethod("convHull", signature(x="SpatVector"),
@@ -710,11 +714,6 @@ setMethod("split", signature(x="SpatVector", f="SpatVector"),
 		}
 		values(f) <- NULL
 		ex <- ext(x)
-		i <- intersect(ext(x), ext(f))
-		if (is.null(i)) {
-			warn("split", "x and f do not intersect")
-			return(x)
-		}
 		r <- relate(x, f, "intersects")
 		if (sum(r) == 0) {
 			warn("split", "x and f do not intersect")

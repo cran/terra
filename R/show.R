@@ -5,7 +5,7 @@
 
 
 win_basename <- function(x) {
-	if (grepl("Windows", utils::osVersion)) {
+	if (isTRUE(grepl("Windows", utils::osVersion))) {
 		large <- nchar(x) > 256
 		if (any(large)) {
 			for (i in 1:length(large)) {
@@ -168,7 +168,7 @@ setMethod ("show" , "SpatVector",
 		cat(" coord. ref. :", .name_or_proj4(object), "\n")
 		if (d[2] > 0) {
 			nr <- min(d[1], 3)
-			dd <- as.data.frame(object[1:nr,])
+			dd <- as.data.frame(object)[1:nr, , drop=FALSE]
 			printDF(dd, 3, TRUE)
 		}
 	}
@@ -285,7 +285,7 @@ setMethod ("show" , "SpatRaster",
 						if (nsr == (mxsrc+1)) {
 							cat("             ", sources[mxsrc+1], lbsprint[mxsrc+1], "\n")
 						} else {
-							cat("             ", "... and", nsr-mxsrc, "more source(s)\n")
+							cat("             ", "... and", nsr-mxsrc, "more sources\n")
 						}
 					}
 				} else {

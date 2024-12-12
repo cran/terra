@@ -400,7 +400,7 @@ retro_labels <- function(x, lat=TRUE) {
 	graphics::rect(e$xmin, e$ymin, e$xmax, e$ymax, border=ticboxcol, xpd=NA)
 
 
-    if (!is.null(x$leg$title)) {
+    if (isTRUE("title" %in% names(x$leg))) {
 		leg_i <- x$leg$leg_i
 		if (is.null(leg_i)) leg_i = 1
 	    if (leg_i <= length(x$leg$title)) {
@@ -409,13 +409,15 @@ retro_labels <- function(x, lat=TRUE) {
 			legtitle <- x$leg$title[1]		
 		}
 		e <- x$leg$ext
-		if (x$leg$x %in% c("top", "bottom")) {
-			txt <- paste(legtitle, collapse=" ")
-		} else {
-			txt <- paste(legtitle, collapse="\n")		
-		}
+		if (length(legtitle) > 1) { # or perhaps !inherits(legtitle, "expression")
+			if (x$leg$x %in% c("top", "bottom")) {
+				legtitle <- paste(legtitle, collapse=" ")
+			} else {
+				legtitle <- paste(legtitle, collapse="\n")		
+			}
+		} 
 		# offset=.5*graphics::strheight("a",cex=x$leg$title.cex)
-		text(x=e$xmax, y=e$ymax, labels=txt, pos=3, cex=x$leg$title.cex, xpd=NA)
+		text(x=e$xmax, y=e$ymax, labels=legtitle, pos=3, cex=x$leg$title.cex, xpd=NA)
 	}
 	x
 }

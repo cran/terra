@@ -25,9 +25,6 @@
 
 #ifdef useRcpp
 #include <Rcpp.h>
-// Rcpp::depends(RcppProgress)
-//#include "progress.hpp"
-//#include "progress_bar.hpp"
 #endif
 
 typedef long long int_64;
@@ -177,6 +174,10 @@ class SpatRasterSource {
 		void set_names_time_ncdf(std::vector<std::string> metadata, std::vector<std::vector<std::string>> bandmeta, std::string &msg);
 		void set_names_time_grib(std::vector<std::vector<std::string>> bandmeta, std::string &msg);
 		void set_names_time_tif(std::vector<std::vector<std::string>> bandmeta, std::string &msg);
+		
+		std::vector<std::map<std::string, std::string>> lyrTags;
+		void addLyrTag(size_t slyr, std::string name, std::string value);
+		
 };
 
 
@@ -205,7 +206,6 @@ class SpatRaster {
 	public:
 
 #ifdef useRcpp
-//		Progress* pbar;
 		SpatProgress pbar;
 		bool progressbar = false;
 #endif
@@ -231,20 +231,19 @@ class SpatRaster {
 		std::string getError() { return msg.getError();}
 		std::string getMessage() { return msg.getMessage();}
 
-		std::map<std::string, std::string> tags;
+		std::map<std::string, std::string> user_tags;
 		bool addTag(std::string name, std::string value);
 		bool removeTag(std::string name);
 		std::string getTag(std::string name);
 		std::vector<std::string> getTags();
 
-		std::vector<std::map<std::string, std::string>> lyrTags;
 		void addLyrTags(std::vector<size_t> lyrs, std::vector<std::string> names, std::vector<std::string> values);
 
 		bool removeLyrTags();
 		bool removeLyrTag(size_t lyr, std::string name);
 		std::string getLyrTag(size_t lyr, std::string name);
 		std::vector<std::string> getLyrTags(std::vector<size_t> lyrs);
-
+		std::vector<std::map<std::string, std::string>> getAllLyrTags();
 		//double NA = std::numeric_limits<double>::quiet_NaN();
 
 		size_t ncol();
@@ -340,7 +339,7 @@ class SpatRaster {
 		std::vector<int_64> getTime();
 		std::string getTimeStep();
 		std::string getTimeZone();
-		std::vector<std::string> getTimeStr(bool addstep);
+		std::vector<std::string> getTimeStr(bool addstep, std::string timesep);
 		bool setTime(std::vector<int_64> time, std::string step, std::string zone);
 		
 		std::vector<double> getDepth();
@@ -398,6 +397,9 @@ class SpatRaster {
 ////////////////////////////////////////////////////
 // helper methods
 ////////////////////////////////////////////////////
+
+
+		std::vector<std::string> getAllFiles();
 
 		void gdalogrproj_init(std::string path);
 
@@ -592,10 +594,9 @@ class SpatRaster {
  		SpatRaster aggregate(std::vector<size_t> fact, std::string fun, bool narm, SpatOptions &opt);
 		SpatExtent align(SpatExtent e, std::string snap);
 		SpatRaster rst_area(bool mask, std::string unit, bool transform, int rcmax, SpatOptions &opt);
-
 		std::vector<std::vector<double>> sum_area(std::string unit, bool transform, bool by_value, SpatOptions &opt);
-
 		std::vector<std::vector<double>> sum_area_group(SpatRaster group, std::string unit, bool transform, bool by_value, SpatOptions &opt);
+		SpatRaster surfaceArea(SpatOptions &opt);
 
 		SpatRaster roll(size_t n, std::string fun, std::string type, bool circular, bool narm, SpatOptions &opt);
 
@@ -655,6 +656,8 @@ class SpatRaster {
 		SpatRaster direction_vector(SpatVector p, bool from, bool degrees, SpatOptions &opt);
 		
 		SpatRaster clumps(int directions, bool zeroAsNA, SpatOptions &opt);
+		SpatRaster patches(size_t directions, SpatOptions &opt);
+
 
 		SpatRaster edges(bool classes, std::string type, unsigned directions, double falseval, SpatOptions &opt);
 		SpatRaster extend(SpatExtent e, std::string snap, double fill, SpatOptions &opt);
@@ -688,6 +691,7 @@ class SpatRaster {
 		SpatDataFrame mglobal(std::vector<std::string> funs, bool narm, SpatOptions &opt);
 
 		SpatDataFrame global(std::string fun, bool narm, SpatOptions &opt);
+		SpatDataFrame globalTF(std::string fun, SpatOptions &opt);
 		SpatDataFrame global_weighted_mean(SpatRaster &weights, std::string fun, bool narm, SpatOptions &opt);
 
 		SpatRaster gridDistance(double m, SpatOptions &opt);
@@ -829,6 +833,8 @@ class SpatRaster {
 
 #ifdef useGDAL
 		bool getDSh(GDALDatasetH &rstDS, SpatRaster &out, std::string &filename, std::string &driver, double &naval, bool update, double background, SpatOptions &opt);
+		bool getDShMEM(GDALDatasetH &rstDS, SpatRaster &out, double &naval, double background, SpatOptions &opt);
+		
 		bool open_gdal(GDALDatasetH &hDS, int src, bool update, SpatOptions &opt);
 		bool create_gdalDS(GDALDatasetH &hDS, std::string filename, std::string driver, bool fill, double fillvalue, std::vector<bool> has_so, std::vector<double> scale, std::vector<double> offset, SpatOptions& opt);
 		bool from_gdalMEM(GDALDatasetH hDS, bool set_geometry, bool get_values);

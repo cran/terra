@@ -312,8 +312,16 @@ setMethod("global", signature(x="SpatRaster"),
 			return(res)
 		}
 
-		if (inherits(txtfun, "character")) {
+		if (inherits(txtfun, "character")) {		
 			if (any(is.na(txtfun))) error("global", "fun cannot be NA")
+			if (any(txtfun %in% c("anynotNA", "anyNA"))) {
+				if (length(txtfun) > 1) error("global", "'anynotNA' and 'anyNA' can not be combined with other functions'")
+				ptr <- x@ptr$globalTF(txtfun, opt)
+				messages(ptr, "global")
+				res <- .getSpatDF(ptr)
+				rownames(res) <- nms
+				return(res)			
+			}
 			if (all(txtfun %in% c("prod", "max", "min", "mean", "sum", "range", "rms", "sd", "std", "sdpop", "notNA", "isNA"))) {
 				txtfun[txtfun == "sdpop"] <- "std"
 				i <- grep("range", txtfun)

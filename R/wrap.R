@@ -1,6 +1,24 @@
 
+setClass("Packed", contains="VIRTUAL")
 
-setClass("PackedSpatVector",
+setMethod("show", signature(object="Packed"),
+	function(object) {
+		print(paste("This is a", class(object), "object. Use 'terra::unwrap()' to unpack it"))
+	}
+)
+
+
+setClass("PackedSpatExtent", contains="Packed",
+	representation (
+		extent = "numeric"
+	),
+	prototype (
+		extent = numeric()
+	)
+)
+
+
+setClass("PackedSpatVector", contains="Packed",
 	representation (
 		type = "character",
 		crs = "character",
@@ -15,7 +33,7 @@ setClass("PackedSpatVector",
 )
 
 
-setClass("PackedSpatRaster",
+setClass("PackedSpatRaster", contains="Packed",
 	representation (
 		definition = "character",
 		values = "matrix",
@@ -26,7 +44,9 @@ setClass("PackedSpatRaster",
 	)
 )
 
-setClass("PackedSpatRasterDC",
+
+
+setClass("PackedSpatRasterDC", contains="Packed",
 	representation (
 		type = "character",
 		rasters = "list"
@@ -89,12 +109,6 @@ setMethod("vect", signature(x="PackedSpatVector"),
 )
 
 
-setMethod("show", signature(object="PackedSpatVector"),
-	function(object) {
-		print(paste("This is a", class(object), "object. Use 'terra::unwrap()' to unpack it"))
-	}
-)
-
 
 
 setMethod("as.character", signature(x="SpatRaster"),
@@ -126,20 +140,24 @@ setMethod("as.character", signature(x="SpatRaster"),
 
 writeSources <- function(x, fsource, ftarget, overwrite, ...) {
 	fex <- file.exists(ftarget)
-	k <- fsource == ""
-	if (isTRUE(overwrite)) {
-		file.copy(fsource[!k], ftarget[!k])
-	} else if (isFALSE(overwrite) && (any(fex))) {
+	if (isFALSE(overwrite) && (any(fex))) {
 		error("wrap", "file(s) exist(s) and 'overwrite=FALSE'")
-	} else if (!all(fex)) {
-		k[fex] <- FALSE
-		fex[k] <- TRUE
-		file.copy(fsource[!fex], ftarget[!fex])					
 	}
-	if (any(k)) {
-		for (i in which(k)) {
-			r <- subsetSource(x, i)
-			writeRaster(r, ftarget[i], ...)
+	mem <- fsource == ""
+	for (i in 1:length(mem)) {
+		r <- subsetSource(x, i)
+		if (mem[i]) {
+			writeRaster(r, ftarget[i], overwrite=TRUE, ...)
+		} else {
+			ff <- r@ptr$getAllFiles();
+			if (length(ff) > 1) {
+				target_noex <- tools::file_path_sans_ext(basename(ftarget[i]))
+				source_noex <- tools::file_path_sans_ext(basename(fsource[i]))
+				fftarget <- file.path(dirname(ftarget[i]), gsub(source_noex, target_noex, basename(ff)))
+				file.copy(ff, fftarget)
+			} else {
+				file.copy(fsource[i], ftarget[i])
+			}
 		}
 	}
 }
@@ -212,6 +230,22 @@ setMethod("wrapCache", signature(x="SpatRaster"),
 		finalizeWrap(x, r)		
 	}
 )
+
+setMethod("wrap", signature(x="SpatExtent"),
+	function(x) {
+		r <- methods::new("PackedSpatExtent")
+		r@extent <- as.vector(x)
+		r
+	}
+)
+
+setMethod("unwrap", signature(x="PackedSpatExtent"),
+	function(x) {
+		ext(x@extent)
+	}
+)
+
+	
 
 setMethod("wrap", signature(x="SpatRaster"),
 	function(x, proxy=FALSE) {
@@ -342,22 +376,25 @@ setMethod("rast", signature(x="PackedSpatRaster"),
 	}
 )
 
-setMethod("show", signature(object="PackedSpatRaster"),
-	function(object) {
-		print(paste("This is a", class(object), "object. Use 'terra::unwrap()' to unpack it"))
-	}
-)
-
-setMethod("show", signature(object="PackedSpatRasterDC"),
-	function(object) {
-		print(paste("This is a", class(object), "object. Use 'terra::unwrap()' to unpack it"))
-	}
-)
 
 
 setMethod("unwrap", signature(x="ANY"),
 	function(x) {
 		x
+	}
+)
+
+
+setMethod("serialize", signature(object="SpatExtent"),
+	function(object, connection, ascii = FALSE, xdr = TRUE, version = NULL, refhook = NULL) {
+		serialize(wrap(object), connection=connection, ascii = ascii, xdr = xdr, version = version, refhook = refhook)
+	}
+)
+
+
+setMethod("saveRDS", signature(object="SpatExtent"),
+	function(object, file="", ascii = FALSE, version = NULL, compress=TRUE, refhook = NULL) {
+		saveRDS(wrap(object), file=file, ascii = ascii, version = version, compress=compress, refhook = refhook)
 	}
 )
 

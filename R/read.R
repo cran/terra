@@ -3,12 +3,6 @@
 # Version 1.0
 # License GPL v3
 
-readAll <- function(x) {
-	ok <- x@ptr$readAll()
-	x <- messages(x, "readAll")
-	invisible(ok)
-}
-
 setMethod("readStart", signature(x="SpatRaster"),
 	function(x) {
 		success <- x@ptr$readStart()
@@ -54,6 +48,22 @@ setMethod("readStop", signature(x="SpatRasterDataset"),
 		success <- x@ptr$readStop()
 		messages(x, "readStop")
 		invisible(success)
+	}
+)
+
+setMethod("toMemory", signature(x="SpatRaster"),
+	function(x) {
+		x@ptr <- x@ptr$deepcopy()
+		x@ptr$readAll()
+		messages(x, "toMemory")
+	}
+)
+
+setMethod("toMemory", signature(x="SpatRasterDataset"),
+	function(x) {
+		x@ptr <- x@ptr$deepcopy()
+		x@ptr$readAll()
+		messages(x, "toMemory")
 	}
 )
 

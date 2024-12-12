@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2023  Robert J. Hijmans
+// Copyright (c) 2018-2025  Robert J. Hijmans
 //
 // This file is part of the "spat" library.
 //
@@ -47,7 +47,7 @@ SpatVectorCollection SpatVector::bienvenue() {
 std::vector<std::string> SpatVector::wkt() {
 	GEOSContextHandle_t hGEOSCtxt = geos_init();
 	std::vector<GeomPtr> g = geos_geoms(this, hGEOSCtxt);
-	std::vector<std::string> out;
+	std::vector<std::string> out::crop
 	out.reserve(g.size());
 	char * wkt;
 	for (size_t i = 0; i < g.size(); i++) {
@@ -327,6 +327,10 @@ std::vector<std::vector<unsigned>> SpatVector::index_sparse(SpatVector v) {
 SpatVector SpatVector::crop(SpatExtent e, bool wrap) {
 
 	SpatVector out;
+	if ((e.xmin == e.xmax) || (e.ymin == e.ymax)) {
+		return *this;	
+	}
+
 
 #ifndef GEOS350
 	out.setError("GEOS 3.5 required for crop");
@@ -735,37 +739,59 @@ SpatVector SpatVector::split_polygons(SpatVector lns) {
 		g = v.geoms[0];
 */
 
+
+
+SpatVector polygonize_one(const GEOSGeometry* gi, GEOSContextHandle_t hGEOSCtxt) {
+
+	size_t ngeoms = 1;
+	std::vector<GeomPtr> p(1);
+	SpatVector out;
+
+	GEOSGeometry* r = GEOSPolygonize_r(hGEOSCtxt, &gi, ngeoms);
+	if (r == NULL) {
+		out.setError("something bad happened");
+		geos_finish(hGEOSCtxt);
+		return out;
+	}
+	if (GEOSisEmpty_r(hGEOSCtxt, r)) {
+		GEOSGeom_destroy_r(hGEOSCtxt, r);
+	} else {
+		p[0] = geos_ptr(r, hGEOSCtxt);
+		SpatVectorCollection coll = coll_from_geos(p, hGEOSCtxt);
+		out = coll.get(0);
+		out.aggregate(false);
+	}
+	return out;
+}
+
 SpatVector SpatVector::polygonize() {
+
+	if (type() == "polygons") {
+		return *this;
+	}
 
 	SpatVector out;
 	out.srs = srs;
 	GEOSContextHandle_t hGEOSCtxt = geos_init();
 
 	std::vector<GeomPtr> g = geos_geoms(this, hGEOSCtxt);
-	std::vector<GeomPtr> p;
-	p.reserve(g.size());
-	size_t ngeoms = 1;
-	for (size_t i = 0; i < g.size(); i++) {
+
+	const GEOSGeometry* gi = g[0].get();
+	out = polygonize_one(gi, hGEOSCtxt);
+
+	for (size_t i = 1; i < g.size(); i++) {
 		const GEOSGeometry* gi = g[i].get();
-		GEOSGeometry* r = GEOSPolygonize_r(hGEOSCtxt, &gi, ngeoms);
-		if (r == NULL) {
-			out.setError("something bad happened");
-			geos_finish(hGEOSCtxt);
-			return out;
-		}
-		if (!GEOSisEmpty_r(hGEOSCtxt, r)) {
-			p.push_back(geos_ptr(r, hGEOSCtxt));
-		} else {
-			GEOSGeom_destroy_r(hGEOSCtxt, r);
-		}
-	}
-	if (!p.empty()) {
-		SpatVectorCollection coll = coll_from_geos(p, hGEOSCtxt);
-		out = coll.get(0);
-		out.srs = srs;
-		out.df = df;
+		SpatVector onegeom = polygonize_one(gi, hGEOSCtxt);
+		out.addGeom(onegeom.getGeom(0));
 	}
 	geos_finish(hGEOSCtxt);
+
+	out.srs = srs;
+	if (df.nrow() != out.size()) {
+		out.addWarning("dropped attributes");
+	} else {
+		out.df = df;
+	}
 	return out;
 }
 
@@ -864,6 +890,7 @@ SpatVector SpatVector::crop(SpatVector v) {
 
 	SpatVector out;
 	out.srs = srs;
+	if (v.empty()) return *this;
 
 	GEOSContextHandle_t hGEOSCtxt = geos_init();
 
@@ -905,6 +932,8 @@ SpatVector SpatVector::crop(SpatVector v) {
 //		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt);
 		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt, ids);
 		out = coll.get(0);
+//		std::vector<std::string> nms = out.get_names();
+//		out = out.aggregate(nms[0], true);
 		out.df = df.subset_rows(out.df.iv[0]);
 		out.srs = srs;
 	}
@@ -962,9 +991,9 @@ SpatVector SpatVector::hull(std::string htype, std::string by) {
 		}
 	}
 
+	SpatVector a = aggregate(false);
 
 	GEOSContextHandle_t hGEOSCtxt = geos_init();
-	SpatVector a = aggregate(false);
 	std::vector<GeomPtr> g = geos_geoms(&a, hGEOSCtxt);
 	//std::string vt = type();
 	GEOSGeometry* h;
@@ -1175,9 +1204,16 @@ SpatVector SpatVector::buffer(std::vector<double> d, unsigned quadsegs, std::str
 	out = coll.get(0);
 	out.srs = srs;
 	out.df = df;
+
+// revdep problem with ShapePattern
+	if (std::isnan(out.extent.xmin)) {
+		SpatVector empty;
+		empty.srs = srs;
+		return empty;
+	}
+	
 	return out;
 }
-
 
 
 // basic version of buffer, for debugging

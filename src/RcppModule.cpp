@@ -6,7 +6,6 @@
 #include "NA.h"
 #include "spatTime.h"
 //#include "spatVector2.h"
-
 //static void SpatRaster_finalizer( SpatRaster* ptr ){
 //}
 
@@ -338,7 +337,8 @@ RCPP_MODULE(spat){
 		.method("add_column_long", (bool (SpatDataFrame::*)(std::vector<long>, std::string name))( &SpatDataFrame::add_column))
 		.method("add_column_string", (bool (SpatDataFrame::*)(std::vector<std::string>, std::string name))( &SpatDataFrame::add_column))
 		.method("add_column_factor", (bool (SpatDataFrame::*)(SpatFactor, std::string name))( &SpatDataFrame::add_column))
-		.method("add_column_bool", &SpatDataFrame::add_column_bool)
+		.method("add_column_bool", (bool (SpatDataFrame::*)(std::vector<int>, std::string name))( &SpatDataFrame::add_column_bool))
+
 		.method("add_column_time", &SpatDataFrame::add_column_time)
 
 		.method("remove_column", (bool (SpatDataFrame::*)(std::string field))( &SpatDataFrame::remove_column))
@@ -650,6 +650,8 @@ RCPP_MODULE(spat){
 		.method("addLyrTags", &SpatRaster::addLyrTags)
 		.method("getLyrTags", &SpatRaster::getLyrTags)
 
+		.method("getAllFiles", &SpatRaster::getAllFiles)
+
 
 		//.field("name", &SpatRaster::name)
 		.method("getFileBlocksize", &SpatRaster::getFileBlocksize)
@@ -831,6 +833,7 @@ RCPP_MODULE(spat){
 		.method("rst_area", &SpatRaster::rst_area)
 		.method("sum_area", &SpatRaster::sum_area)
 		.method("sum_area_group", &SpatRaster::sum_area_group)
+		.method("surface_area", &SpatRaster::surfaceArea)
 
 		.method("as_points", &SpatRaster::as_points)
 		.method("as_points_value", &SpatRaster::as_points_value)
@@ -847,6 +850,7 @@ RCPP_MODULE(spat){
 		.method("bilinearValues", &SpatRaster::bilinearValues)
 
 		.method("patches", &SpatRaster::clumps)
+		.method("patches2", &SpatRaster::patches)
 		.method("boundaries", &SpatRaster::edges)
 		.method("buffer", &SpatRaster::buffer)
 		.method("gridDistance", &SpatRaster::gridDistance)
@@ -895,7 +899,7 @@ RCPP_MODULE(spat){
 
 		.method("get_aggregates", &SpatRaster::get_aggregates)
 		.method("get_aggregate_dims", &SpatRaster::get_aggregate_dims2)
-	//	.method("global", &SpatRaster::global)
+		.method("globalTF", &SpatRaster::globalTF)
 		.method("mglobal", &SpatRaster::mglobal)
 		.method("layerCor", &SpatRaster::layerCor)
 		.method("global_weighted_mean", &SpatRaster::global_weighted_mean)
@@ -1025,6 +1029,7 @@ RCPP_MODULE(spat){
 
 		.method("readStart", &SpatRasterStack::readStart)
 		.method("readStop", &SpatRasterStack::readStop)
+		.method("readAll", &SpatRasterStack::readAll)
 		.method("nsds", &SpatRasterStack::nsds)
 		.method("ncol", &SpatRasterStack::ncol)
 		.method("nrow", &SpatRasterStack::nrow)
@@ -1048,6 +1053,9 @@ RCPP_MODULE(spat){
 		.method("extractCell", &SpatRasterStack::extractCell)
 		.method("extractVector", &SpatRasterStack::extractVector)
 		.method("crop", &SpatRasterStack::crop)
+		.method("addTag", &SpatRasterStack::addTag)
+		.method("getTags", &SpatRasterStack::getTags)
+
 	;
 }
 

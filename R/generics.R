@@ -37,10 +37,13 @@ setMethod("weighted.mean", signature(x="SpatRaster", w="SpatRaster"),
 	}
 )
 
-
-
 setMethod("patches", signature(x="SpatRaster"),
-	function(x, directions=4, zeroAsNA=FALSE, allowGaps=TRUE, filename="", ...) {
+	function(x, directions=4, values=FALSE, zeroAsNA=FALSE, allowGaps=TRUE, filename="", ...) {
+		if (values) {
+			opt <- spatOptions(filename, ...)
+			x@ptr <- x@ptr$patches2(directions, opt)
+			return(messages(x, "patches"))			
+		}
 		if (allowGaps) {
 			opt <- spatOptions(filename, ...)
 			x@ptr <- x@ptr$patches(directions[1], zeroAsNA[1], opt)
@@ -132,6 +135,15 @@ setMethod("cellSize", signature(x="SpatRaster"),
 		if (!lyrs) x <- x[[1]]
 		x@ptr <- x@ptr$rst_area(mask, unit, transform, rcx, opt)
 		messages(x, "cellSize")
+	}
+)
+
+
+setMethod("surfArea", signature(x="SpatRaster"),
+	function(x, filename="", ...) {
+		opt <- spatOptions(filename, ...)
+		x@ptr <- x@ptr$surface_area(opt)
+		messages(x, "surfArea")
 	}
 )
 

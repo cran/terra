@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2023  Robert J. Hijmans
+// Copyright (c) 2018-2025  Robert J. Hijmans
 //
 // This file is part of the "spat" library.
 //
@@ -2558,7 +2558,7 @@ SpatGeom hullify(SpatVector b, bool ispoly) {
 
 SpatVector lonlat_buf(SpatVector x, double dist, unsigned quadsegs, bool ispol, bool ishole) {
 
-
+/*
 	if ((x.extent.ymin > -60) && (x.extent.ymax < 60) && 
 			((x.extent.ymax - x.extent.ymin) < 1) && dist < 110000) {
 				
@@ -2573,13 +2573,17 @@ SpatVector lonlat_buf(SpatVector x, double dist, unsigned quadsegs, bool ispol, 
 		x.srs = insrs;
 		return x;
 	}
-
+*/
 	x = x.disaggregate(false);
 	SpatVector tmp;
 	tmp.reserve(x.size());
 	//Rcpp::Rcout << x.geoms.size() << std::endl;
+
+//	double interval = std::max(1000.0, std::max(x.extent.ymax - x.extent.ymin, x.extent.xmax - x.extent.xmin) * 100);  // m
 	for (size_t i=0; i<x.geoms.size(); i++) {
 		SpatVector p(x.geoms[i]);
+//		p = p.densify(interval, true, false);
+
 		p.srs = x.srs;
 		p = p.as_points(false, true);
 		std::vector<double> d(p.size(), dist);
@@ -2744,7 +2748,11 @@ double area_plane(const SpatGeom &geom) {
 std::vector<double> SpatVector::area(std::string unit, bool transform, std::vector<double> mask) {
 
 	if (type() != "polygons") { // area is zero
-		std::vector<double>	out(nrow());
+		std::vector<double>	out(nrow(), 0);
+		return out;
+	}
+	if (nrow() == 0) {
+		std::vector<double>	out(1, 0);	
 		return out;
 	}
 

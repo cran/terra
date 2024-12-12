@@ -3,6 +3,14 @@
 # Version 1.0
 # License GPL v3
 
+setMethod("set.values", signature(x="SpatRasterDataset"),
+	function(x)  {	
+		x@ptr$readAll()
+		messages(x, "set.values")
+	}
+)
+
+
 setMethod("set.values", signature(x="SpatRaster"),
 	function(x, cells, values, layer=0)  {
 
@@ -50,7 +58,8 @@ setMethod("set.values", signature(x="SpatRaster"),
 				error("set.values", "some (but not all) layer numbers are < 1")
 			}
 			if (missing(cells) && missing(values)) {
-				return(readAll(x))
+				x@ptr$readAll()
+				return(messages(x, "set.values"))
 			}
 			bylyr <- FALSE
 			if (!is.null(dim(values))) {
@@ -258,6 +267,11 @@ setReplaceMethod("[", c("SpatRaster", "ANY", "ANY", "ANY"),
 	function(x, i, j, k, value) {
 
 		m <- c(missing(i), missing(j), missing(k))
+		if (all(m) && is.matrix(value) && ((nrow(value) == nrow(x)) && (ncol(value) == ncol(x) * nlyr(x)))) {
+			values(x) <- value
+			return(x)
+		}
+		
 		s <- rep(FALSE, 3)
 		if (!m[1]) s[1] <- inherits(i, "list")
 		if (!m[2]) s[2] <- inherits(j, "list")
@@ -276,7 +290,7 @@ setReplaceMethod("[", c("SpatRaster", "ANY", "ANY", "ANY"),
 			m[3] <- TRUE
 		}
 
-		if ((!m[1]) && (inherits(i, "matrix"))) {
+		if ((!m[1]) && (inherits(i, "matrix"))) {		
 			if (ncol(i) == 1) {
 				i <- i[,1]
 			} else if (ncol(i) == 2) {

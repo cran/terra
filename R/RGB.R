@@ -20,7 +20,15 @@ setMethod("set.RGB", signature(x="SpatRaster"),
 		if (is.null(value[1]) || is.na(value[1]) || any(value < 1)) {
 			x@ptr$removeRGB()
 		} else {
-			stopifnot(all(value %in% 1:nlyr(x)))
+			if (inherits(value, "character")) {
+				i <- match(value, names(x))
+				j <- !is.na(i)
+				value[j] <- i[j]
+				value <- as.integer(value)
+			}
+			if (!all(value %in% 1:nlyr(x))) {
+				error("set.RGB", "value(s) are not value layer numbers")			
+			}
 			if (length(value) == 3) {
 				x@ptr$setRGB(value[1]-1, value[2]-1, value[3]-1, -99, type)
 			} else if (length(value) == 4) {
@@ -43,11 +51,16 @@ setMethod("RGB<-", signature(x="SpatRaster"),
 )
 
 setMethod("RGB", signature(x="SpatRaster"),
-	function(x) {
-		if (x@ptr$rgb) {
-			x@ptr$getRGB() + 1
+	function(x, value=NULL, type="rgb") {
+		if (!is.null(value)) {
+			RGB(x, type=type) <- value
+			return(x)
 		} else {
-			return(NULL)
+			if (x@ptr$rgb) {
+				x@ptr$getRGB() + 1
+			} else {
+				return(NULL)
+			}
 		}
 	}
 )
@@ -152,7 +165,7 @@ rgb2col <- function(x, value, stretch=NULL, grays=FALSE, NAzero=FALSE, filename=
 	m[,1] <- m[,1] - 1
 	r <- rast(x, 1)
 	r[m$id] <- m$group
-	coltab(r) <- m[,-2]
+	coltab(r) <- unique(m[,-2])
 	if (filename != "") {
 		r <- writeRaster(r, filename, overwrite, ...)
 	}
@@ -167,9 +180,9 @@ terra_col2rgb <- function(x, alpha=FALSE, filename="", overwrite=FALSE, ...) {
 	}
 	ct <- coltab(x)[[1]]
 	if (is.null(ct)) {
-		error("error", "x has no color table")
+		error("colorize", "x has no color table")
 	}
-	ct <- as.matrix(ct)
+	ct <- unique(as.matrix(ct))
 	nms <- c("red", "green", "blue", "alpha")
 	rgbidx <- 1:4
 	if (!alpha) {
@@ -207,6 +220,8 @@ setMethod("colorize", signature(x="SpatRaster"),
 			x@ptr <- x@ptr$hsx2rgb(to, opt)
 		} else if (to == "col") {
 			return(rgb2col(x, stretch=stretch, grays=grays, NAzero=NAzero, filename=filename, overwrite=overwrite, ...))
+		} else {
+			error("colorize", "'to' is not valid. Should be 'rgb', 'col', 'hsi', 'hsl', or 'hsv'")
 		}
 		messages(x)
 	}

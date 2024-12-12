@@ -57,6 +57,7 @@ class SpatRasterStack {
 
 		bool readStart();
 		bool readStop();
+		bool readAll();
 		unsigned nsds();
 		unsigned nrow();
 		unsigned ncol();
@@ -78,6 +79,14 @@ class SpatRasterStack {
 		SpatRaster collapse();
 		SpatRaster summary_numb(std::string fun, std::vector<double> add, bool narm, SpatOptions &opt);
 		SpatRaster summary(std::string fun, bool narm, SpatOptions &opt);
+		
+		
+		std::map<std::string, std::string> tags;
+		bool addTag(std::string name, std::string value);
+		bool removeTag(std::string name);
+		std::string getTag(std::string name);
+		std::vector<std::string> getTags();
+		
 };
 
 
