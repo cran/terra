@@ -17,15 +17,10 @@
 
 #include "spatRasterMultiple.h"
 #include "string_utils.h"
+#include "file_utils.h"
 
 
 SpatRasterCollection SpatRasterCollection::deepCopy() { return *this; }
-void SpatRasterCollection::setError(std::string s) { msg.setError(s); }
-void SpatRasterCollection::addWarning(std::string s) { msg.addWarning(s); }
-bool SpatRasterCollection::has_error() { return msg.has_error; }
-bool SpatRasterCollection::has_warning() { return msg.has_warning; }
-std::vector<std::string> SpatRasterCollection::getWarnings() { return msg.getWarnings(); }
-std::string SpatRasterCollection::getError() { return msg.getError(); }
 
 SpatRasterCollection::SpatRasterCollection(size_t n) { ds.resize(n); };
 
@@ -103,8 +98,72 @@ void SpatRasterCollection::erase(size_t i) {
 	}
 }
 
-SpatRasterCollection SpatRasterCollection::crop(SpatExtent e, std::string snap, bool expand, std::vector<unsigned> use, SpatOptions &opt) {
 
+std::string SpatRasterCollection::make_vrt(std::vector<std::string> options, bool reverse, SpatOptions &opt) {
+
+	std::string outfile = opt.get_filename();
+	if (outfile.empty()) {
+		outfile = tempFile(opt.get_tempdir(), opt.tmpfile, ".vrt");
+	} else if (file_exists(outfile) && (!opt.get_overwrite())) {
+		setError("output file exists. You can use 'overwrite=TRUE' to overwrite it");
+		return("");
+	}
+	opt.set_filenames({outfile});
+
+	std::vector<std::string> ff;
+	ff.reserve(size());
+	
+	SpatOptions xopt(opt);
+	for (size_t i=0; i<size(); i++) {
+//		if (!ds[i].hasValues()) continue;
+		std::vector<std::string> f = ds[i].filenames();
+		if ((ds[i].nsrc() == 1) && f[0] != "") {
+			ff.push_back(f[0]);
+		} else {
+			std::string tmpf = tempFile(xopt.get_tempdir(), xopt.tmpfile, "_temp_raster.tif");
+			xopt.set_filenames({tmpf});
+			SpatRaster out = ds[i].writeRaster(xopt);
+			if (out.hasError()) {
+				setError(out.getError());
+				return "";
+			}
+			ff.push_back(tmpf);
+		}
+	}
+	SpatRaster tmp;
+	if (reverse) std::reverse(ff.begin(), ff.end());
+	return tmp.make_vrt(ff, options, opt);
+}
+
+
+void SpatRasterCollection::readBlock(SpatRaster &r, std::vector<std::vector<double>> &v, BlockSize bs, size_t i, std::vector<unsigned> use, SpatOptions opt){
+
+	if ((bs.row[i] + bs.nrows[i]) > r.nrow()) {
+		setError("invalid rows/columns");
+		return;
+	}
+	if (bs.nrows[i]==0) {
+		return;
+	}
+	SpatExtent re = r.getExtent();
+	double yres = r.yres();
+	double ymx = re.ymax - bs.row[i] * yres;
+	double ymn = re.ymax - (bs.row[i] + bs.nrows[i]) * yres;
+	SpatExtent e = {re.xmin, re.xmax, ymn, ymx};
+	SpatRasterCollection x = crop(e, "near", true, use, opt);
+	if (x.hasError()) {
+		setError(x.getError());
+		return;
+	}
+	v.resize(x.size());
+	for (size_t i=0; i< x.size(); i++) {
+		x.ds[i].readValues(v[i], 0, x.ds[i].nrow(), 0, x.ds[i].ncol());
+	}
+}
+
+
+
+SpatRasterCollection SpatRasterCollection::crop(SpatExtent e, std::string snap, bool expand, std::vector<unsigned> use, SpatOptions &opt) {
 
 	SpatRasterCollection out;
 	if ( !e.valid() ) {
@@ -121,9 +180,11 @@ SpatRasterCollection SpatRasterCollection::crop(SpatExtent e, std::string snap, 
 			SpatExtent xe = e.intersect(ds[i].getExtent());
 			if (xe.valid_notempty()) {
 				SpatRaster r = ds[i].crop(e, snap, expand, ops);
-				if (!r.hasError()) {
-					out.push_back(r, "");
-				}
+				if (r.hasError()) {
+					out.setError(r.getError());
+					return out;
+				} 
+				out.push_back(r, "");
 			}
 		}
 	} else {
@@ -131,9 +192,11 @@ SpatRasterCollection SpatRasterCollection::crop(SpatExtent e, std::string snap, 
 			SpatExtent xe = e.intersect(ds[use[i]].getExtent());
 			if (xe.valid_notempty()) {
 				SpatRaster r = ds[use[i]].crop(e, snap, expand, ops);
-				if (!r.hasError()) {
-					out.push_back(r, "");
+				if (r.hasError()) {
+					out.setError(r.getError());
+					return out;
 				}
+				out.push_back(r, "");
 			}
 		}
 	}
@@ -211,13 +274,47 @@ std::vector<std::string> SpatRasterCollection::filenames() {
 		
 
 
+bool SpatRasterCollection::addTag(std::string name, std::string value) {
+	lrtrim(name);
+	lrtrim(value);
+	if (value == "") {
+		return removeTag(name);
+	} else if (name != "") {
+		tags[name] = value;
+		return true;
+	} 
+	return false;
+}
+
+bool SpatRasterCollection::removeTag(std::string name) {
+	std::map<std::string, std::string>::iterator it = tags.find(name);
+	if (it == tags.end()) return false;
+	tags.erase(it);
+	return true;
+}
+
+std::string SpatRasterCollection::getTag(std::string name) {
+	std::map<std::string, std::string>::iterator it = tags.find(name);
+	if (it != tags.end()) return it->second;
+	return "";
+}
+
+std::vector<std::string> SpatRasterCollection::getTags() {
+	std::vector<std::string> out;
+	out.reserve(2 * tags.size());
+	for(auto e : tags) {
+		out.push_back(e.first);
+		out.push_back(e.second);
+	}
+	return out;
+}
+
+
+
+/////////////////////////////////////////////////
+
 SpatRasterStack SpatRasterStack::deepCopy() { return *this; }
-void SpatRasterStack::setError(std::string s) { msg.setError(s); }
-void SpatRasterStack::addWarning(std::string s) { msg.addWarning(s); }
-bool SpatRasterStack::has_error() { return msg.has_error; }
-bool SpatRasterStack::has_warning() { return msg.has_warning; }
-std::vector<std::string> SpatRasterStack::getWarnings() { return msg.getWarnings();}
-std::string SpatRasterStack::getError() { return msg.getError();}
+
 
 SpatRasterStack::SpatRasterStack(SpatRaster r, std::string name, std::string longname, std::string unit, bool warn) { 
 	push_back(r, name, longname, unit, warn); 
@@ -437,7 +534,7 @@ SpatRasterStack SpatRasterStack::crop(SpatExtent e, std::string snap, bool expan
 	}
 	for (size_t i=0; i<ds.size(); i++) {
 		out.push_back(ds[i].crop(e, snap, expand, opt), names[i], long_names[i], units[i], true);
-		if (has_error()) {
+		if (hasError()) {
 			return(out);
 		}
 	}
@@ -478,6 +575,7 @@ SpatRaster SpatRasterStack::collapse() {
 			}
 		}
 	} 
+	out.user_tags = tags;
 	return out;
 }
 

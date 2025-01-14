@@ -147,6 +147,24 @@ double SpatSRS::to_meter() {
 	return out;
 }
 
+
+bool SpatSRS::m_dist(double &m, bool lonlat, std::string unit) {
+	m = 1;
+	if (!lonlat) {
+		m = to_meter();
+		m = std::isnan(m) ? 1 : m;
+	}
+	std::vector<std::string> ss {"m", "km"};
+	if (std::find(ss.begin(), ss.end(), unit) == ss.end()) {
+		return false;
+	}
+	if (unit == "km")	{
+		m /= 1000;
+	}
+	return true;
+}
+
+
 bool SpatSRS::is_same(SpatSRS other, bool ignoreempty) {
 	if (ignoreempty) {
 		if (is_empty() || other.is_empty()) {
@@ -247,8 +265,12 @@ bool wkt_from_string(std::string input, std::string& wkt, std::string& msg) {
 
 
 
-bool can_transform(std::string fromCRS, std::string toCRS) {
+void EmptyErrorHandler(CPLErr eErrClass, int errNo, const char *msg) {
+    // do nothing
+}
 
+
+bool can_transform(std::string fromCRS, std::string toCRS) {
 	OGRSpatialReference source, target;
 	const char *pszDefFrom = fromCRS.c_str();
 	OGRErr erro = source.SetFromUserInput(pszDefFrom);
@@ -262,14 +284,21 @@ bool can_transform(std::string fromCRS, std::string toCRS) {
 	}
 
 	OGRCoordinateTransformation *poCT;
-	poCT = OGRCreateCoordinateTransformation(&source, &target);
-	if( poCT == NULL )	{
+    CPLPushErrorHandler(EmptyErrorHandler);
+	try{
+		poCT = OGRCreateCoordinateTransformation(&source, &target);
+	} catch(...) {
+		return false;
+	}
+    CPLPopErrorHandler();
+	if (poCT == NULL) {
 		OCTDestroyCoordinateTransformation(poCT);
 		return false;
 	}
 	OCTDestroyCoordinateTransformation(poCT);
 	return true;
 }
+
 
 
 SpatMessages transform_coordinates(std::vector<double> &x, std::vector<double> &y, std::string fromCRS, std::string toCRS) {

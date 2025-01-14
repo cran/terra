@@ -8,6 +8,8 @@ if (!isGeneric("NIDP")) {setGeneric("NIDP", function(x, ...) standardGeneric("NI
 if (!isGeneric("flowAccumulation")) {setGeneric("flowAccumulation", function(x, ...) standardGeneric("flowAccumulation"))}
 
 
+if (!isGeneric("divide")) {setGeneric("divide", function(x, ...) standardGeneric("divide"))}
+
 if (!isGeneric("bestMatch")) {setGeneric("bestMatch", function(x, y, ...) standardGeneric("bestMatch"))}
 if (!isGeneric("k_means")) {setGeneric("k_means", function(x, ...) standardGeneric("k_means"))}
 if (!isGeneric("princomp")) {setGeneric("princomp", function(x, ...) standardGeneric("princomp"))}
@@ -133,6 +135,8 @@ if (!isGeneric("RGB<-")) {setGeneric("RGB<-", function(x, ..., value) standardGe
 if (!isGeneric("autocor")) {setGeneric("autocor", function(x, ...) standardGeneric("autocor"))}
 if (!isGeneric("delaunay")) {setGeneric("delaunay", function(x, ...) standardGeneric("delaunay"))}
 if (!isGeneric("voronoi")) {setGeneric("voronoi", function(x, ...) standardGeneric("voronoi"))}
+if (!isGeneric("hull")) {setGeneric("hull", function(x, ...) standardGeneric("hull"))}
+
 if (!isGeneric("convHull")) {setGeneric("convHull", function(x, ...) standardGeneric("convHull"))}
 if (!isGeneric("minRect")) {setGeneric("minRect", function(x, ...) standardGeneric("minRect"))}
 if (!isGeneric("minCircle")) {setGeneric("minCircle", function(x, ...) standardGeneric("minCircle"))}
@@ -215,6 +219,7 @@ if (!isGeneric("hasMinMax")) {setGeneric("hasMinMax", function(x) standardGeneri
 if (!isGeneric("minmax")) {setGeneric("minmax", function(x, ...) standardGeneric("minmax"))}
 if (!isGeneric("nsrc")) { setGeneric("nsrc", function(x) standardGeneric("nsrc")) }
 if (!isGeneric("perim")) {setGeneric("perim", function(x, ...) standardGeneric("perim"))}
+if (!isGeneric("nseg")) {setGeneric("nseg", function(x, ...) standardGeneric("nseg"))}
 if (!isGeneric("project")) {setGeneric("project", function(x,...) standardGeneric("project"))}
 if (!isGeneric("wrapCache")) {setGeneric("wrapCache", function(x, ...) standardGeneric("wrapCache"))}
 if (!isGeneric("wrap")) {setGeneric("wrap", function(x, ...) standardGeneric("wrap"))}
@@ -333,6 +338,7 @@ if (!isGeneric("rescale")) {setGeneric("rescale", function(x, ...) standardGener
 #if (!isGeneric("select")) {setGeneric("select", function(x, ...) standardGeneric("select"))}
 if (!isGeneric("setMinMax")) {setGeneric("setMinMax", function(x, ...) standardGeneric("setMinMax"))}
 if (!isGeneric("scale")) {setGeneric("scale", function(x, center=TRUE, scale=TRUE) standardGeneric("scale"))}
+if (!isGeneric("scale_linear")) { setGeneric("scale_linear", function(x, ...) standardGeneric("scale_linear"))}
 if (!isGeneric("shift")) {setGeneric("shift", function(x, ...) standardGeneric("shift"))}
 if (!isGeneric("stdev")) { setGeneric("stdev", function(x, ...) standardGeneric("stdev")) }
 if (!isGeneric("subset")) {setGeneric("subset", function(x, ...) standardGeneric("subset")) }

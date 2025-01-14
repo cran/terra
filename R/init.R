@@ -5,30 +5,31 @@
 
 
 setMethod("init", signature(x="SpatRaster"),
-	function(x, fun, filename="", ...) {
-		opt <- spatOptions(filename, ...)
+	function(x, fun, ..., filename="", wopt=list()) {
 		x <- rast(x)
 		if (is.character(fun)) {
+			opt <- spatOptions(filename, wopt=wopt)
 			x <- rast(x, 1)
 			fun <- fun[1]
 			if (fun %in% c("x", "y", "row", "col", "cell", "chess")) {
-				x@ptr <- x@ptr$initf(fun, TRUE, opt)
+				x@pntr <- x@pntr$initf(fun, TRUE, opt)
 				messages(x, "init")
 			} else if (is.na(fun)) {
-				x@ptr <- x@ptr$initv(as.numeric(NA), opt)
+				x@pntr <- x@pntr$initv(as.numeric(NA), opt)
 				messages(x, "init")
 			} else {
 				error("init", "unknown function")
 			}
 		} else if (is.numeric(fun) || is.logical(fun)) {
-			x@ptr <- x@ptr$initv(fun, opt)
+			opt <- spatOptions(filename, wopt=wopt)
+			x@pntr <- x@pntr$initv(fun, opt)
 			messages(x, "init")
 		} else {
 			nc <- ncol(x) * nlyr(x)
-			b <- writeStart(x, filename, sources=sources(x), ...)
+			b <- writeStart(x, filename, sources=sources(x), wopt=wopt)
 			for (i in 1:b$n) {
 				n <- b$nrows[i] * nc;
-				r <- fun(n)
+				r <- fun(n, ...)
 				if (length(r) != n) {
 					error("init","the number of values returned by 'fun' is not correct")
 				}

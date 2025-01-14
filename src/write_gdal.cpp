@@ -351,6 +351,13 @@ bool SpatRaster::writeStartGDAL(SpatOptions &opt, const std::vector<std::string>
 		setError("invalid driver");
 		return (false);
 	}
+	if (driver == "GTiff") {
+		if (nlyr() > 65535) {
+			setError("cannot write more than 65535 layers");
+			return(false);
+		}
+	}
+	
     char **papszMetadata;
     papszMetadata = poDriver->GetMetadata();
     if (!CSLFetchBoolean( papszMetadata, GDAL_DCAP_RASTER, FALSE)) {
@@ -410,7 +417,7 @@ bool SpatRaster::writeStartGDAL(SpatOptions &opt, const std::vector<std::string>
 			if (is_ratct(source[0].cats[0].d)) {
 				std::fill(hasCT.begin(), hasCT.end(), false);
 			} else if (ct[0].nrow() < 256) {
-				if (opt.datatype_set && (datatype != opt.get_datatype())) {
+				if (opt.datatype_set && (datatype != "INT1U")) {
 					addWarning("change datatype to INT1U to write the color-table");
 				} else {
 					datatype = "INT1U";
@@ -623,7 +630,8 @@ bool SpatRaster::writeStartGDAL(SpatOptions &opt, const std::vector<std::string>
 	if (hasTime()) {
 		tstr = getTimeStr(false, "T");
 		wtime = true;	
-		have_date_time = (tstep == "seconds") || (tstep == "days") || (tstep == "years") || (tstep == "yearmonths");
+		have_date_time = true;
+//		have_date_time = (tstep == "seconds") || (tstep == "days") || (tstep == "years") || (tstep == "yearmonths");
  	}
 	bool wunit = false;
 	if (hasUnit()) {
@@ -1139,7 +1147,6 @@ bool SpatRaster::update_meta(bool names, bool crs, bool ext, SpatOptions &opt) {
 		return false;
 	}
 	GDALDatasetH hDS;
-	GDALRasterBandH poBand;
 	size_t n=0;
 	for (size_t i=0; i<nsrc(); i++) {
 		if (source[i].memory) continue;
@@ -1150,12 +1157,12 @@ bool SpatRaster::update_meta(bool names, bool crs, bool ext, SpatOptions &opt) {
 		}
 		if (names) {
 			for (size_t b=0; b < source[i].nlyr; b++) {
-				poBand = GDALGetRasterBand(hDS, b+1);
+				GDALRasterBandH poBand = GDALGetRasterBand(hDS, b+1);
 				if (GDALGetRasterAccess(poBand) == GA_Update) {
 					GDALSetDescription(poBand, source[i].names[b].c_str());
 				}
 			}
-		} 
+		}
 		if (crs) {
 			std::string crs = source[i].srs.wkt;
 			OGRSpatialReference oSRS;

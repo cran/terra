@@ -2,7 +2,7 @@
 setMethod("droplevels", signature(x="SpatRaster"),
 	function(x, level=NULL, layer=1) {
 		if (is.null(level)) {
-			x@ptr <- x@ptr$droplevels()
+			x@pntr <- x@pntr$droplevels()
 			messages(x)
 		} else {
 			if (is.character(layer)) {
@@ -12,7 +12,7 @@ setMethod("droplevels", signature(x="SpatRaster"),
 				}
 			}
 			x[[layer]][x[[layer]] %in%  level] <- NA
-			x@ptr <- x@ptr$droplevels()
+			x@pntr <- x@pntr$droplevels()
 			messages(x)
 		}
 	}
@@ -21,13 +21,13 @@ setMethod("droplevels", signature(x="SpatRaster"),
 
 setMethod("is.factor", signature(x="SpatRaster"),
 	function(x) {
-		x@ptr$hasCategories()
+		x@pntr$hasCategories()
 	}
 )
 
 setMethod("as.factor", signature(x="SpatRaster"),
 	function(x) {
-		x@ptr = x@ptr$makeCategorical(-1, spatOptions())
+		x@pntr = x@pntr$makeCategorical(-1, spatOptions())
 		messages(x)
 		#if (!hasValues(x)) {
 		#	error("as.factor", "x has no values")
@@ -44,7 +44,7 @@ setMethod("as.factor", signature(x="SpatRaster"),
 
 setMethod("levels", signature(x="SpatRaster"),
 	function(x) {
-		x <- x@ptr$getCategories()
+		x <- x@pntr$getCategories()
 		lapply(x, function(i) {
 			d <- .getSpatDF(i$df)
 			if (ncol(d) == 0) return("")
@@ -56,9 +56,9 @@ setMethod("levels", signature(x="SpatRaster"),
 
 setMethod("levels<-", signature(x="SpatRaster"),
 	function(x, value) {
-		x@ptr <- x@ptr$deepcopy()
+		x@pntr <- x@pntr$deepcopy()
 		if (is.null(value)) {
-			x@ptr$removeCategories(-1)
+			x@pntr$removeCategories(-1)
 			return(messages(x, "levels<-"))
 		} else if (inherits(value, "list")) {
 			for (i in 1:length(value)) {
@@ -72,13 +72,40 @@ setMethod("levels<-", signature(x="SpatRaster"),
 )
 
 
+combineLevels <- function(x, assign=TRUE) {
+	if (nlyr(x) == 1) return(x)
+	nms <- names(x)
+    lv <- levels(x)
+	lv <- lv[sapply(lv, is.data.frame)]
+	un <- unique(sapply(lv, names))
+	if (length(un) > 2) {
+		lv <- lapply(lv, function(i) { colnames(i) <- colnames(lv[[1]]); i})
+	}
+	lv <- try(do.call(rbind, lv), silent=TRUE)
+	if (inherits(lv, "try-error")) { # should not happen anymore
+		error("panel", "cannot use combine categories")
+	}
+	lv <- unique(lv)
+	if (length(unique(lv[,1])) < nrow(lv)) {
+		error("panel", "cannot combine conflicting categories")			
+	}
+	lv <- lv[order(lv[,1]), ]
+	if (assign) {
+		x <- categories(x, 0, lv)
+		names(x) <- nms 
+		x
+	} else {
+		lv
+	}
+}
+
 
 setMethod ("set.cats" , "SpatRaster",
 	function(x, layer=1, value, active=1) {
 
 		if (missing(value)) {
 			error("set.cats", "value cannot be missing")
-			#return(invisible(x@ptr$setCatIndex(layer-1, index)))
+			#return(invisible(x@pntr$setCatIndex(layer-1, index)))
 		}
 
 		if (is.character(layer)) {
@@ -146,7 +173,7 @@ setMethod ("set.cats" , "SpatRaster",
 			value <- value[[1]]
 		}
 		if (is.null(value)) {
-			x@ptr$removeCategories(layer-1)
+			x@pntr$removeCategories(layer-1)
 			messages(x, "set.cats")
 			return(invisible(TRUE))
 		}
@@ -189,7 +216,7 @@ setMethod ("set.cats" , "SpatRaster",
 			cn <- colnames(value)[index+1]
 			if (!(tolower(cn) %in% c("histogram", "count", "red", "green", "blue", "alpha", "opacity", "r", "g", "b", "a"))) {
 				nms[layer] <- cn
-				if (! x@ptr$setNames(nms, FALSE)) {
+				if (! x@pntr$setNames(nms, FALSE)) {
 					error("names<-", "cannot set name")
 				}
 			}
@@ -202,7 +229,7 @@ setMethod ("set.cats" , "SpatRaster",
 		}
 
 		value <- .makeSpatDF(value)
-		ok <- x@ptr$setCategories(layer-1, value, index)
+		ok <- x@pntr$setCategories(layer-1, value, index)
 		x <- messages(x, "set.cats")
 		invisible(ok)
 	}
@@ -213,7 +240,7 @@ setMethod ("set.cats" , "SpatRaster",
 setMethod ("categories" , "SpatRaster",
 	function(x, layer=1, value, active=1, ...) {
 		#... to accept but ignore old argument "index"
-		x@ptr <- x@ptr$deepcopy()
+		x@pntr <- x@pntr$deepcopy()
 		set.cats(x, layer, value, active)
 		x
 	}
@@ -230,12 +257,12 @@ setMethod ("activeCat" , "SpatRaster",
 			}
 		}
 		if (layer < 1) {
-			sapply(1:nlyr(x), function(i) x@ptr$getCatIndex(i-1))
+			sapply(1:nlyr(x), function(i) x@pntr$getCatIndex(i-1))
 		} else {
 			if (!is.factor(x)[layer]) {
 				return(NA)
 			}
-			x@ptr$getCatIndex(layer-1)
+			x@pntr$getCatIndex(layer-1)
 		}
 	}
 )
@@ -262,7 +289,7 @@ setMethod("activeCat<-" , "SpatRaster",
 			}
 		}
 		x <- deepcopy(x)
-		if (!x@ptr$setCatIndex(layer-1, value)) {
+		if (!x@pntr$setCatIndex(layer-1, value)) {
 			error("activeCat", "invalid category index")
 		}
 		x
@@ -274,7 +301,7 @@ setMethod("cats" , "SpatRaster",
 		if (!missing(layer)) {
 			x <- subset(x, layer, NSE=FALSE)
 		}
-		cats <- x@ptr$getCategories()
+		cats <- x@pntr$getCategories()
 		lapply(1:nlyr(x), function(i) {
 			if (cats[[i]]$df$nrow == 0) {
 				return(NULL)
@@ -291,7 +318,7 @@ setMethod("cats" , "SpatRaster",
 	if (!any(ff)) {
 		return (lapply(ff, function(i) NULL))
 	}
-	cats <- x@ptr$getCategories()
+	cats <- x@pntr$getCategories()
 	x <- lapply(1:length(cats), function(i) {
 		if (cats[[i]]$df$nrow == 0) return(NULL)
 		r <- .getSpatDF(cats[[i]]$df)
@@ -312,7 +339,7 @@ setMethod ("as.numeric", "SpatRaster",
 	function(x, index=NULL, filename="", ...) {
 		if (!any(is.factor(x))) {
 			x <- deepcopy(x)
-			x@ptr$setValueType(0)
+			x@pntr$setValueType(0)
 			return(x)
 		}
 		if (nlyr(x) > 1) {
@@ -332,7 +359,7 @@ setMethod ("as.numeric", "SpatRaster",
 				}
 				if (index == 1) {
 					levels(x) <- NULL
-					x@ptr$setValueType(0)
+					x@pntr$setValueType(0)
 					if (filename != "") {
 						x <- writeRaster(x, filename, ...)
 					}
@@ -349,7 +376,7 @@ setMethod ("as.numeric", "SpatRaster",
 			index <- activeCat(x, 1)
 			if (index <= 1) {
 				levels(x) <- NULL
-				x@ptr$setValueType(0)
+				x@pntr$setValueType(0)
 				if (filename != "") {
 					x <- writeRaster(x, filename, ...)
 				}
@@ -438,7 +465,7 @@ setMethod("catalyze", "SpatRaster",
 setMethod("concats", "SpatRaster",
 	function(x, y, filename="", ...) {
 		opt <- spatOptions(filename, ...)
-		x@ptr = x@ptr$combineCats(y@ptr, opt)
+		x@pntr = x@pntr$combineCats(y@pntr, opt)
 		messages(x, "concats")
 	}
 )

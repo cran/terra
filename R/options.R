@@ -3,12 +3,13 @@
 
 .create_options <- function() {
 	opt <- methods::new("SpatOptions")
-	opt@ptr <- SpatOptions$new()
+	opt@pntr <- SpatOptions$new()
 	# check=T does not exist in ancient R
 	tmpdir <- try(tempdir(check = TRUE), silent=TRUE)
-	opt@ptr$tempdir <- normalizePath(tempdir(), winslash="/")
+	opt@pntr$tempdir <- normalizePath(tempdir(), winslash="/")
 	.terra_environment$options <- opt
 	.terra_environment$devs <- NULL
+	.terra_environment$RStudio_warned <- FALSE
 
 	x <- options("terra_default")[[1]]
 	if (!is.null(x)) {
@@ -66,19 +67,20 @@
 			x[[nms[i]]] <- wopt[[i]]
 		}
 	}
-	if (x$messages$has_warning) {
-		warn("options", paste(x$messages$getWarnings(), collapse="\n"))
+	if (x$has_warning()) {
+		warn("options", paste(x$getWarnings(), collapse="\n"))
 	}
-	if (x$messages$has_error) {
-		error("options", x$messages$getError())
+	if (x$has_error()) {
+		error("options", x$getError())
 	}
 	x
 }
 
+
 defaultOptions <- function() {
 	## work around onLoad problem
 	if (is.null(.terra_environment$options)) .create_options()
-	.terra_environment$options@ptr$deepcopy()
+	.terra_environment$options@pntr$deepcopy()
 }
 
 spatOptions <- function(filename="", overwrite=FALSE, ..., wopt=NULL) {
@@ -88,7 +90,7 @@ spatOptions <- function(filename="", overwrite=FALSE, ..., wopt=NULL) {
 	## work around onLoad problem
 	if (is.null(.terra_environment$options)) .create_options()
 
-	opt <- .terra_environment$options@ptr$deepcopy()
+	opt <- .terra_environment$options@pntr$deepcopy()
 	opt$tmpfile <- paste0(gsub("^file", "", basename(tempfile())),  "_", Sys.getpid())
 	filename <- .fullFilename(filename, mustExist=TRUE)
 	if (!is.null(unlist(wopt))) {
@@ -159,7 +161,7 @@ spatOptions <- function(filename="", overwrite=FALSE, ..., wopt=NULL) {
 terraOptions <- function(..., print=TRUE) {
 	dots <- list(...)
 	if (is.null(.terra_environment$options)) .create_options()
-	opt <- .terra_environment$options@ptr
+	opt <- .terra_environment$options@pntr
 
 	nms <- names(dots)
 
@@ -202,6 +204,6 @@ terraOptions <- function(..., print=TRUE) {
 			warn("terraOptions", "memfrac > 0.9")
 		}
 	}
-	.terra_environment$options@ptr <- opt
+	.terra_environment$options@pntr <- opt
 }
 

@@ -27,18 +27,18 @@ yearweek <- function(d) {
 
 setMethod("has.time", signature(x="SpatRaster"),
 	function(x) {
-		x@ptr$hasTime
+		x@pntr$hasTime
 	}
 )
 
 
 setMethod("timeInfo", signature(x="SpatRaster"),
 	function(x) {
-		time <- x@ptr$hasTime
+		time <- x@pntr$hasTime
 		if (time) {
-			step <- x@ptr$timestep
+			step <- x@pntr$timestep
 			if (step == "seconds") {
-				data.frame(time=time, step=step, zone=x@ptr$timezone)
+				data.frame(time=time, step=step, zone=x@pntr$timezone)
 			} else {
 				data.frame(time=time, step=step, zone="")
 			}
@@ -57,9 +57,9 @@ setMethod("timeInfo", signature(x="SpatRasterDataset"),
 
 
 time_as_seconds <- function(x) {
-	d <- x@ptr$time
+	d <- x@pntr$time
 	d <- strptime("1970-01-01", "%Y-%m-%d", tz="UTC") + d
-	tz <- x@ptr$timezone
+	tz <- x@pntr$timezone
 	if (!(tz %in% c("", "UTC"))) {
 		attr(d, "tzone") = tz
 	}
@@ -67,14 +67,54 @@ time_as_seconds <- function(x) {
 }
 
 
+#setMethod("time", signature(x="SpatVector"),
+#	function(x, format="") {
+#		cls <- sapply(values(x[1,]), function(i) { a = class(i); a[length(a)] })
+#		i <- which(cls %in% c("Date", "POSIXt"))[1]
+#		if (is.na(i)) {
+#			return(rep(NA, nrow(x)))
+#		} else {
+#			d <- x[,i,drop=TRUE][,,drop=TRUE]
+#			if (format != "") {
+#				steps <- c("seconds", "days", "months", "years", "yearmonths")
+#				format <- match.arg(tolower(format), steps)
+#				if (!(format %in% steps)) {
+#					error("time", "not a valid time format")
+#				}
+#				tstep <- ifelse(cls[i]=="Date", "days", "seconds")
+#				if (format == "seconds") {
+#					if (tstep != "seconds") {
+#						error("time", "cannot extract seconds from Dates")
+#					}
+#					d
+#				} else if (format == "days") {
+#					as.Date(d)
+#				} else if (format == "yearmonths") {
+#					y <- as.integer(format(d, "%Y"))
+#					y + (as.integer(format(d, "%m"))-1)/12
+#				} else if (format == "months") {
+#					as.integer(format(d, "%m"))
+#				} else if (format == "years") {
+#					as.integer(format(d, "%Y"))
+#				}
+#			} else {
+#				d
+#			}
+#		}
+#	}
+#)
+
 setMethod("time", signature(x="SpatRaster"),
 	function(x, format="") {
-		if (!x@ptr$hasTime) {
+		if (!x@pntr$hasTime) {
 			return(rep(NA, nlyr(x)))
 		}
-		d <- x@ptr$time
-		tstep <- x@ptr$timestep
+		d <- x@pntr$time
+		tstep <- x@pntr$timestep
+		
 		if (format != "") {
+			steps <- c("seconds", "days", "months", "years", "yearmonths")
+			format <- match.arg(tolower(format), steps)
 			if ((format == "months") && (tstep == "years")) {
 				error("time", "cannot extract months from years-time")
 			} else if ((format == "years") && (tstep %in% c("months"))) {
@@ -87,28 +127,30 @@ setMethod("time", signature(x="SpatRaster"),
 				error("time", "cannot extract days from this type of time data")
 			}
 			tstep <- format
-		} 
+		} else if (tstep == "raw") {
+			return(d)
+		}
+		
+		
+		d <- strptime("1970-01-01", "%Y-%m-%d", tz="UTC") + d
 		if (tstep == "seconds") {
-			d <- strptime("1970-01-01", "%Y-%m-%d", tz="UTC") + d
-			tz <- x@ptr$timezone
+			tz <- x@pntr$timezone
 			if (!(tz %in% c("", "UTC"))) {
 				attr(d, "tzone") = tz
 			}
 			d
 		} else if (tstep == "days") {
-			d <- strptime("1970-01-01", "%Y-%m-%d", tz = "UTC") + d
 			as.Date(d)
 		} else if (tstep == "yearmonths") {
-			d <- strptime("1970-01-01", "%Y-%m-%d", tz = "UTC") + d
 			y <- as.integer(format(d, "%Y"))
 			y + (as.integer(format(d, "%m"))-1)/12
 		} else if (tstep == "months") {
-			d <- strptime("1970-01-01", "%Y-%m-%d", tz = "UTC") + d
 			as.integer(format(d, "%m"))
 		} else if (tstep == "years") {
-			d <- strptime("1970-01-01", "%Y-%m-%d", tz = "UTC") + d
 			as.integer(format(d, "%Y"))
-		} else { # raw
+#		} else if (tstep == "yearweeks") {
+#			yearweek(as.Date(d))
+		} else { # ???
 			d
 		}
 	}
@@ -145,7 +187,7 @@ setMethod("time<-", signature(x="SpatRaster"),
 			tstep <- ""
 		}
 		if (is.null(value)) {
-			x@ptr$setTime(0[0], "remove", "")
+			x@pntr$setTime(0[0], "remove", "")
 			return(x)
 		}
 		if (inherits(value, "character")) {
@@ -155,7 +197,8 @@ setMethod("time<-", signature(x="SpatRaster"),
 			error("time<-", "length(value) != nlyr(x)")
 		}
 		if (tstep != "") {
-			tstep = match.arg(as.character(tstep), c("seconds", "days", "months", "years", "yearmonths", "raw"))
+#			tstep = match.arg(as.character(tstep), c("seconds", "days", "months", "years", "yearmonths", "raw"))
+			tstep = match.arg(as.character(tstep), c("months", "years", "yearmonths", "raw"))
 		}
 		## may not be necessary
 		if (tstep == "seconds") tstep = ""
@@ -216,7 +259,7 @@ setMethod("time<-", signature(x="SpatRaster"),
 				stept <- "raw"
 			}
 		}
-		if (!x@ptr$setTime(as.numeric(value), stept, tzone)) {
+		if (!x@pntr$setTime(as.numeric(value), stept, tzone)) {
 			error("time<-", "cannot set these values")
 		}
 		return(x)
@@ -256,7 +299,7 @@ setMethod("time<-", signature(x="SpatRasterDataset"),
 
 setMethod("depth", signature(x="SpatRaster"),
 	function(x) {
-		x@ptr$depth
+		x@pntr$depth
 	}
 )
 
@@ -264,11 +307,11 @@ setMethod("depth", signature(x="SpatRaster"),
 setMethod("depth<-", signature(x="SpatRaster"),
 	function(x, value)  {
 		if (is.null(value)) {
-			x@ptr$setDepth(0[0])
+			x@pntr$setDepth(0[0])
 			return(x)
 		}
 		value <- as.numeric(value)
-		if (! x@ptr$setDepth(value)) {
+		if (! x@pntr$setDepth(value)) {
 			error("depth<-", "cannot set these  values")
 		}
 		return(x)
@@ -289,7 +332,7 @@ setMethod("linearUnits", signature(x="SpatVector"),
 
 setMethod("units", signature(x="SpatRaster"),
 	function(x) {
-		x@ptr$units
+		x@pntr$units
 	}
 )
 
@@ -300,7 +343,7 @@ setMethod("units<-", signature(x="SpatRaster"),
 		} else {
 			value <- as.character(value)
 		}
-		if (! x@ptr$set_units(value)) {
+		if (! x@pntr$set_units(value)) {
 			error("units<-", "cannot set these  values")
 		}
 		return(x)
@@ -310,14 +353,14 @@ setMethod("units<-", signature(x="SpatRaster"),
 
 setMethod("units", signature(x="SpatRasterDataset"),
 	function(x) {
-		x@ptr$units
+		x@pntr$units
 	}
 )
 
 setMethod("units<-", signature(x="SpatRasterDataset"),
 	function(x, value)  {
 		value <- as.character(value)
-		x@ptr$units <- value
+		x@pntr$units <- value
 		return(x)
 	}
 )

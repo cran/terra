@@ -25,24 +25,28 @@ setMethod("merge", signature(x="SpatVector", y="SpatVector"),
 	}
 )
 
-setMethod("merge", signature(x="SpatRaster", y="SpatRaster"),
-	function(x, y, ..., first=TRUE, na.rm=TRUE, filename="", overwrite=FALSE, wopt=list()) {
-		rc <- sprc(x, y, ...)
-		opt <- spatOptions(filename, overwrite, wopt=wopt)
-		x@ptr <- rc@ptr$merge(first[1], na.rm, opt)
-		messages(x, "merge")
-	}
-)
-
 
 setMethod("merge", signature(x="SpatRasterCollection", "missing"),
-	function(x, first=TRUE, na.rm=TRUE, filename="", ...) {
+	function(x, first=TRUE, na.rm=TRUE, algo=1, method=NULL, filename="", ...) {
 		opt <- spatOptions(filename, ...)
 		out <- rast()
-		out@ptr <- x@ptr$merge(first[1], na.rm, opt)
+		if (is.null(method)) method = ""
+		out@pntr <- x@pntr$merge(first[1], na.rm, algo, method, opt)
+		if (algo == 3) {
+			messages(opt, "merge")
+		}
+		messages(x, "merge")
 		messages(out, "merge")
 	}
 )
+
+setMethod("merge", signature(x="SpatRaster", y="SpatRaster"),
+	function(x, y, ..., first=TRUE, na.rm=TRUE, algo=1, method=NULL, filename="", overwrite=FALSE, wopt=list()) {
+		rc <- sprc(x, y, ...)
+		merge(rc, first=first, na.rm=na.rm, algo=algo, method=method, filename=filename, overwrite=overwrite, wopt=wopt)
+	}
+)
+
 
 
 setMethod("mosaic", signature(x="SpatRaster", y="SpatRaster"),
@@ -53,7 +57,7 @@ setMethod("mosaic", signature(x="SpatRaster", y="SpatRaster"),
 		}
 		opt <- spatOptions(filename, overwrite, wopt=wopt)
 		rc <- sprc(x, y, ...)
-		x@ptr <- rc@ptr$mosaic(fun, opt)
+		x@pntr <- rc@pntr$mosaic(fun, opt)
 		messages(x, "mosaic")
 	}
 )
@@ -66,7 +70,7 @@ setMethod("mosaic", signature(x="SpatRasterCollection", "missing"),
 		if (!inherits(fun, "character")) {
 			error("mosaic", "function 'fun' is not valid")
 		}
-		out@ptr <- x@ptr$mosaic(fun, opt)
+		out@pntr <- x@pntr$mosaic(fun, opt)
 		messages(out, "mosaic")
 	}
 )

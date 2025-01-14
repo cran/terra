@@ -16,15 +16,25 @@
 // along with spat. If not, see <http://www.gnu.org/licenses/>.
 
 #include "spatVector.h"
+#include <fstream>
 #include "string_utils.h"
 #include <stdexcept>
-#include "NA.h"
-
+#include "vecmath.h"
 
 #ifdef useGDAL
 
 #include "file_utils.h"
 #include "ogrsf_frmts.h"
+
+
+bool driverSupports(std::string driver, std::string option) {
+	if (driver == "GPKG") {
+		if (option == "ENCODING") {
+			return false;
+		}
+	}
+    return true;
+}
 
 
 GDALDataset* SpatVector::write_ogr(std::string filename, std::string lyrname, std::string driver, bool append, bool overwrite, std::vector<std::string> options) {
@@ -146,7 +156,9 @@ GDALDataset* SpatVector::write_ogr(std::string filename, std::string lyrname, st
 						nGroupTransactions = 0;
 					}
 				} else {
-					papszOptions = CSLSetNameValue(papszOptions, gopt[0].c_str(), gopt[1].c_str() );
+					if (driverSupports(driver,  gopt[0])) {
+						papszOptions = CSLSetNameValue(papszOptions, gopt[0].c_str(), gopt[1].c_str() );
+					}
 				}
 			}
 		}
@@ -175,7 +187,12 @@ GDALDataset* SpatVector::write_ogr(std::string filename, std::string lyrname, st
 		if (tps[i] == "double") {
 			otype = OFTReal;
 		} else if (tps[i] == "long") {
-			otype = OFTInteger64;
+			std::vector<long> rge = vrange(df.getI(i), true);
+			if ((rge[0] >= -2147483648) && (rge[1] <= 2147483648)) {
+				otype = OFTInteger;
+			} else { 
+				otype = OFTInteger64;
+			}
 		} else if (tps[i] == "bool") {
 			otype = OFTInteger;
 			eSubType = OFSTBoolean;
@@ -394,7 +411,6 @@ GDALDataset* SpatVector::GDAL_ds() {
 }
 
 
-#include <fstream>
 
 bool SpatDataFrame::write_dbf(std::string filename, bool overwrite, SpatOptions &opt) {
 // filename is here "raster.tif"
