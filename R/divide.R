@@ -83,26 +83,26 @@ setMethod("divide", signature(x="SpatRaster"),
 			if (length(n) > 1) {
 				for (i in 1:length(n)) {
 					if (n[i] == 1) {
-						out <- unlist(lapply(out, \(i) splitNS(i)))
+						out <- unlist(lapply(out, function(i) splitNS(i)))
 					} else if (n[i] == -1) {
-						out <- unlist(lapply(out, \(i) splitWE(i)))
+						out <- unlist(lapply(out, function(i) splitWE(i)))
 					} else if (n[i] == 2) {
-						out <- unlist(lapply(out, \(i) splitNS3(i)))
+						out <- unlist(lapply(out, function(i) splitNS3(i)))
 					} else { # if (n[i] == -2) {
-						out <- unlist(lapply(out, \(i) splitWE3(i)))
+						out <- unlist(lapply(out, function(i) splitWE3(i)))
 					}
 				}
 			} else {
 				for (i in 1:n) {
 					if (north) {
-						out <- unlist(lapply(out, \(s) splitNS(s)))
+						out <- unlist(lapply(out, function(s) splitNS(s)))
 					} else {
-						out <- unlist(lapply(out, \(s) splitWE(s)))
+						out <- unlist(lapply(out, function(s) splitWE(s)))
 					}
 					north <- !north
 				}  
 			}
-			out <- lapply(out, \(i) as.polygons(ext(i))) |> vect()
+			out <- vect(lapply(out, function(i) as.polygons(ext(i))))
 			crs(out) <- crs(out)
 		}
 		out$zones <- 1:nrow(out)
@@ -170,7 +170,7 @@ strip_polygon <- function(x, vertical, horizontal) {
 		})
 		xbnds <- matrix(c(ex$xmin, rep(edges,rep(2,length(edges))), ex$xmax), ncol=2, byrow=TRUE)
 		xbnds <- cbind(xbnds, ex$ymin, ex$ymax)
-		xbnds <- do.call(rbind, apply(xbnds, 1, \(i) as.polygons(ext(i))))
+		xbnds <- do.call(rbind, apply(xbnds, 1, function(i) as.polygons(ext(i))))
 		xbnds$vid <- 1:nrow(xbnds)
 	}
 	if (!is.null(horizontal)) {
@@ -183,7 +183,7 @@ strip_polygon <- function(x, vertical, horizontal) {
 		})
 		ybnds <- matrix(c(ex$ymin, rep(edges,rep(2,length(edges))), ex$ymax), ncol=2, byrow=TRUE)
 		ybnds <- cbind(ex$xmin, ex$xmax, ybnds)
-		ybnds <- do.call(rbind, apply(ybnds, 1, \(i) as.polygons(ext(i))))
+		ybnds <- do.call(rbind, apply(ybnds, 1, function(i) as.polygons(ext(i))))
 		ybnds$hid <- 1:nrow(ybnds)
 
 		if (!is.null(vertical)) {
@@ -235,7 +235,7 @@ setMethod("divide", signature(x="SpatVector"),
 			if (n == 1) return(deepcopy(x))
 			out <- lapply(1:nrow(x), function(i) divide_polygon(x[i], n, w, alpha, ...))
 		}
-		return()
+		do.call(rbind, out)
 	}
 )
 

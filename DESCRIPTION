@@ -1,8 +1,8 @@
 Package: terra
 Type: Package
 Title: Spatial Data Analysis
-Version: 1.8-10
-Date: 2025-01-13
+Version: 1.8-15
+Date: 2025-01-23
 Depends: R (>= 3.5.0)
 Suggests: parallel, tinytest, ncdf4, sf (>= 0.9-8), deldir, XML,
         leaflet (>= 2.2.1), htmlwidgets
@@ -20,8 +20,10 @@ BugReports: https://github.com/rspatial/terra/issues/
 LazyLoad: yes
 Authors@R: c(
 	person("Robert J.", "Hijmans", role=c("cre", "aut"),  
-			email="r.hijmans@gmail.com", comment=c(ORCID="0000-0001-5872-2872")),
+			email="r.hijmans@gmail.com", comment=c(ORCID="0000-0001-5872-2872")),			
+    person("Márcia", "Barbosa", role="ctb"),
     person("Roger", "Bivand", role="ctb", comment=c(ORCID="0000-0003-2392-6140")),
+    person("Andrew", "Brown", role="ctb"),
     person("Michael", "Chirico", role="ctb"),
     person("Emanuele", "Cordano", role="ctb",comment=c(ORCID="0000-0002-3508-5898")),
     person("Krzysztof", "Dyba", role="ctb", comment=c(ORCID="0000-0002-8614-3816")),
@@ -29,9 +31,11 @@ Authors@R: c(
     person("Barry", "Rowlingson", role="ctb"),
     person("Michael D.", "Sumner", role="ctb"))
 NeedsCompilation: yes
-Packaged: 2025-01-13 21:06:42 UTC; rhijm
+Packaged: 2025-01-24 05:47:16 UTC; rhijm
 Author: Robert J. Hijmans [cre, aut] (<https://orcid.org/0000-0001-5872-2872>),
+  Márcia Barbosa [ctb],
   Roger Bivand [ctb] (<https://orcid.org/0000-0003-2392-6140>),
+  Andrew Brown [ctb],
   Michael Chirico [ctb],
   Emanuele Cordano [ctb] (<https://orcid.org/0000-0002-3508-5898>),
   Krzysztof Dyba [ctb] (<https://orcid.org/0000-0002-8614-3816>),
@@ -39,4 +43,4 @@ Author: Robert J. Hijmans [cre, aut] (<https://orcid.org/0000-0001-5872-2872>),
   Barry Rowlingson [ctb],
   Michael D. Sumner [ctb]
 Repository: CRAN
-Date/Publication: 2025-01-14 01:10:02 UTC
+Date/Publication: 2025-01-24 08:30:02 UTC

@@ -1,4 +1,22 @@
-# version 1.8-9
+# version 1.8-15
+
+## bug fixes
+
+- `readRDS` failed for rasters with timestep="seconds" [#1711](https://github.com/rspatial/terra/issues/1711) by Pascal Oettli
+- `divide<SpatVector>` always returned NULL [#1724](https://github.com/rspatial/terra/issues/1724) by Márcia Barbosa
+- `erase` failed in some cases [#1710](https://github.com/rspatial/terra/issues/1710) by erkent-carb
+
+## enhancements
+
+- `bestMatch` now has argument "fun" to allow the use of different distance measures, and a <matrix> method
+- `wrap` (and `writeRDS`) now captures varnames/longnames [#1719](https://github.com/rspatial/terra/issues/1719) by Andrew Gene Brown
+- improved raster metadata writing [#1714](https://github.com/rspatial/terra/pull/1714) by Andrew Gene Brown
+- `vect` and `writeVector` now properly read and write date and datetime data. [#1718](https://github.com/rspatial/terra/issues/1718) by Andrew Gene Brown
+- improved estimate of available memory on linux systems [#1506](https://github.com/rspatial/terra/issues/1506) by Cedric Rossi
+
+# version 1.8-10
+
+Released 2025-01-13
 
 ## bug fixes
 
@@ -84,6 +102,7 @@ Released 2024-12-12
 - `vect<SpatGraticule>` method suggested in relation to [tidyterra #155](https://github.com/dieghernan/tidyterra/issues/155) by Diego Hernangómez
 - `toMemory<SpatRaster>` and `<SpatRasterDataset>` methods [#1660](https://github.com/rspatial/terra/pull/1660) by Derek Friend
 
+
 # version 1.7-83
 
 Released 2024-10-14
@@ -115,7 +134,7 @@ Released 2024-10-14
 
 ## new 
 
-- `map-region` returns the coordinates of the axes position of a map created with `plot<Spat*>` [#1517](https://github.com/rspatial/terra/issues/1517) by Daniel Schuch
+- `map_extent` returns the coordinates of the axes position of a map created with `plot<Spat*>` [#1517](https://github.com/rspatial/terra/issues/1517) by Daniel Schuch
 - `polys<leaflet>` method [#1543](https://github.com/rspatial/terra/issues/1543) by Márcia Barbosa
 - `plot<SpatVectorCollection>` method [#1532](https://github.com/rspatial/terra/issues/1532) by jedgroev
 - `add_mtext` to add text around the margins of a map. [#1567](https://github.com/rspatial/terra/issues/1567) by Daniel Schuch

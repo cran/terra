@@ -246,47 +246,68 @@ setMethod("direction", signature(x="SpatRaster"),
 
 
 
-setMethod("bestMatch", signature(x="SpatRaster", y="SpatVector"),
-	function(x, y, labels=NULL, filename="", ...) {
-		e <- as.matrix(extract(x, y, fun="mean", na.rm=TRUE, ID=FALSE))
-		d <- list()
-		for (i in 1:nrow(e)) {
-		  d[[i]] <- sum((x - e[i,])^2)
-		}	
-		out <- which.min(rast(d))
+
+match_abs <- function(x, y, ...) {
+	d <- colMeans(abs(y - x), ...)
+	which.min(d)[1]
+}
+
+match_sqr <- function(x, y, ...) {
+	d <- colMeans((y - x)^2, ...)
+	which.min(d)[1]
+}
+
+
+
+setMethod("bestMatch", signature(x="SpatRaster", y="matrix"),
+	function(x, y, labels=NULL, fun="squared", ..., filename="", overwrite=FALSE, wopt=list()) {
+		
+		if (!(all(colnames(y) %in% names(x)) && (all(names(x) %in% colnames(y))))) {
+			error("bestMatch", "names of x and y must match")
+		}
+		
+		if (inherits(fun, "character")) {
+			fun <- match.arg(tolower(fun), c("abs", "squared"))
+			if (fun == "abs") {
+				f <- match_abs
+			} else {
+				f <- match_sqr
+			}	
+			out <- app(x, f, y=t(y), ...)
+		} else {
+			out <- app(x, fun, y=t(y), ...)
+		}
+
 		if (!is.null(labels)) {
 			levels(out) <- data.frame(ID=1:nrow(y), label=labels)
 		}
 		if (filename!="") {
-			out <- writeRaster(out, filename, ...)
+			out <- writeRaster(out, filename, wopt=wopt)
 		}
 		out
 	}
 )
 
+
+setMethod("bestMatch", signature(x="SpatRaster", y="SpatVector"),
+	function(x, y, labels=NULL, fun="squared", ..., filename="", overwrite=FALSE, wopt=list()) {
+		y <- as.matrix(extract(x, y, fun="mean", ..., na.rm=TRUE, ID=FALSE))
+		bestMatch(x, y, labels=labels, fun=fun, filename=filename, ...)
+	}
+)
+
 setMethod("bestMatch", signature(x="SpatRaster", y="data.frame"),
-	function(x, y, labels=NULL, filename="", ...) {
+	function(x, y, labels=NULL, fun="squared", ..., filename="", overwrite=FALSE, wopt=list()) {
 		
 		if (!(all(names(y) %in% names(x)) && (all(names(x) %in% names(y))))) {
 			error("bestMatch", "names of x and y must match")
 		}
-		y <- y[, names(x)]
+#		y <- y[, names(x), drop=FALSE]
 		i <- unique(sapply(y, class))
 		if (any(i != "numeric")) {
 			error("bestMatch", "all values in y must be numeric")
 		}
 		y <- as.matrix(y)
-		d <- list()
-		for (i in 1:nrow(y)) {
-		  d[[i]] <- sum((x - y[i,])^2)
-		}	
-		out <- which.min(rast(d))
-		if (!is.null(labels)) {
-			levels(out) <- data.frame(ID=1:nrow(y), label=labels)
-		}
-		if (filename!="") {
-			out <- writeRaster(out, filename, ...)
-		}
-		out
+		bestMatch(x, y, labels=labels, fun=fun, filename=filename, ...)
 	}
 )

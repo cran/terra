@@ -215,6 +215,12 @@ setMethod("text", signature(x="SpatRaster"),
 		} else if (is.numeric(labels)) {
 			labels <- as.character(round(labels, digits=digits) )
 		}
+		if (length(labels) < nrow(xy)) {
+			labels <- rep(labels, nrow(xy))
+		}
+#		if (!overlap) {
+#			xy <- getLabelXY(xy, labels, cex)
+#		}
 		if (halo && (isTRUE(hw > 0))) {
 			.halo(xy[,1], xy[,2], labels, hc=hc, hw=hw, ...)
 		} else {
@@ -327,7 +333,7 @@ shade <- function(slope, aspect, angle=45, direction=0, normalize=FALSE, filenam
 map.pal <- function(name, n=50, ...) { 
 	n <- round(n)
 	if (n < 1) {
-		error("map.pal", "n should be > 0")	
+		error("map.pal", "n should be >= 1")	
 	}
 	f <- system.file("colors/palettes.rds", package="terra")
 	v <- readRDS(f)
@@ -343,7 +349,8 @@ map.pal <- function(name, n=50, ...) {
 		}
 	} else if (name == "random") {
 		if (n > 433) {
-			error("map.pal", "you cannot get more than 433 random colors")
+			warning("map.pal", "you cannot get > 433 random colors; using n=433 instead")
+			n <- 433
 		}
 		s <- sample(grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = TRUE)], n)
 		rgb(t(grDevices::col2rgb(s))/255)
