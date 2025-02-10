@@ -86,23 +86,20 @@ void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &o
 	for (size_t k=outstart; k<outend; k++) {
 		out[k] = std::vector<double>(n, NAN);
 	}
-	
-	
+
 	for (size_t i=0; i<bs.n; i++) {
 		if (!useblock[i]) continue;
 		std::vector<double> v;
 		rs.readBlock(v, bs, i);
 		int_64 rstart = bs.row[i];
 		int_64 rend = bs.row[i] + bs.nrows[i];
+		size_t off1 = bs.nrows[i] * nc;
 		for (size_t j=0; j<n; j++) {
 //			if (rows[j] >= rend) break; // if rows are sorted
 			if ((rows[j] >= rstart) && (rows[j] < rend)) {
 				size_t cell = (rows[j]-rstart) * nc + cols[j];
 				for (size_t lyr=0; lyr<nl; lyr++) {
-					size_t off = lyr * bs.nrows[i] * nc;
-					for (size_t k=outstart; k<outend; k++) {
-						out[k][j] = v[cell+off]; 
-					}
+					out[outstart + lyr][j] = v[cell+lyr * off1]; 
 				}
 			}
 		}
@@ -176,7 +173,7 @@ std::vector<double> circ_dist(double xres, double yres, double d, size_t nrows, 
 	v[v.size()/2] = 1;
 	SpatOptions opt;
 	x.setValues(v, opt);
-	x = x.distance(NAN, NAN, false, "m", false, "cosine", opt);	
+	x = x.distance(NAN, NAN, false, "m", false, "cosine", false, -1, opt);	
 
 	std::vector<double> out;
 	x.getValuesSource(0, out);				
@@ -203,7 +200,7 @@ std::vector<std::vector<double>> SpatRaster::extractBuffer(const std::vector<dou
 		return out;
 	}
 	if (nlyr() > 1) {
-		setError("can only do this for one layer at a time");
+		setError("can only use a search_radius for one layer at a time");
 		return out;
 	}
 

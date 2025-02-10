@@ -1,6 +1,8 @@
 #if (!isGeneric("#")) { setGeneric("#", function(x, ...) standardGeneric("#")) }
 #if (!isGeneric("prcomp")) {setGeneric("prcomp", function(x, ...) standardGeneric("princomp"))}
 
+
+
 ## ADDED BY ecor
 if (!isGeneric("watershed")) {setGeneric("watershed", function(x, ...) standardGeneric("watershed"))}
 if (!isGeneric("pitfinder")) {setGeneric("pitfinder", function(x, ...) standardGeneric("pitfinder"))}
@@ -8,6 +10,7 @@ if (!isGeneric("NIDP")) {setGeneric("NIDP", function(x, ...) standardGeneric("NI
 if (!isGeneric("flowAccumulation")) {setGeneric("flowAccumulation", function(x, ...) standardGeneric("flowAccumulation"))}
 
 
+if (!isGeneric("thresh")) {setGeneric("thresh", function(x, ...) standardGeneric("thresh"))}
 if (!isGeneric("divide")) {setGeneric("divide", function(x, ...) standardGeneric("divide"))}
 
 if (!isGeneric("bestMatch")) {setGeneric("bestMatch", function(x, y, ...) standardGeneric("bestMatch"))}
@@ -85,6 +88,7 @@ if (!isGeneric("set.ext")) {setGeneric("set.ext", function(x, ...) standardGener
 if (!isGeneric("set.names")) {setGeneric("set.names", function(x, ...) standardGeneric("set.names"))}
 if (!isGeneric("set.crs")) {setGeneric("set.crs", function(x, ...) standardGeneric("set.crs"))}
 if (!isGeneric("set.RGB")) {setGeneric("set.RGB", function(x, ...) standardGeneric("set.RGB"))}
+if (!isGeneric("set.window")) {setGeneric("set.window", function(x, ...) standardGeneric("set.window"))}
 
 
 if (!isGeneric("math")) { setGeneric("math", function(x, ...) standardGeneric("math")) }
@@ -151,6 +155,7 @@ if (!isGeneric("not.na")) {setGeneric("not.na", function(x, ...) standardGeneric
 if (!isGeneric("erase")) {setGeneric("erase", function(x, y, ...) standardGeneric("erase"))}
 if (!isGeneric("gaps")) {setGeneric("gaps", function(x, ...) standardGeneric("gaps"))}
 if (!isGeneric("is.rotated")) {setGeneric("is.rotated", function(x, ...) standardGeneric("is.rotated"))}
+if (!isGeneric("is.flipped")) {setGeneric("is.flipped", function(x, ...) standardGeneric("is.flipped"))}
 
 if (!isGeneric("is.int")) {setGeneric("is.int", function(x) standardGeneric("is.int"))}
 if (!isGeneric("as.int")) {setGeneric("as.int", function(x, ...) standardGeneric("as.int"))}

@@ -951,9 +951,7 @@ SpatVector SpatVector::crop(SpatVector v) {
 	ids.reserve(nx);
 
 	for (size_t i = 0; i < nx; i++) {
-	//	Rcpp::Rcout << "intersection " << i;
 		GEOSGeometry* geom = GEOSIntersection_r(hGEOSCtxt, x[i].get(), y[0].get());
-	//	Rcpp::Rcout << " done" << std::endl;
 		if (geom == NULL) {
 			out.setError("GEOS exception");
 			geos_finish(hGEOSCtxt);
@@ -971,8 +969,9 @@ SpatVector SpatVector::crop(SpatVector v) {
 
 	if (!result.empty()) {
 //		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt);
-		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt, ids);
-		out = coll.get(0);
+//		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt, ids);
+		SpatVectorCollection coll = coll_from_geos(result, hGEOSCtxt, ids, true, false);
+		out = coll.get(0);	
 //		std::vector<std::string> nms = out.get_names();
 //		out = out.aggregate(nms[0], true);
 		out.df = df.subset_rows(out.df.iv[0]);
@@ -1593,6 +1592,8 @@ std::vector<int> SpatVector::relate(SpatVector v, std::string relation, bool pre
 	std::vector<GeomPtr> y = geos_geoms(&v, hGEOSCtxt);
 	size_t nx = size();
 	size_t ny = v.size();
+
+	out.reserve(nx * ny);
 
 	if (!index) {
 		out.reserve(nx*ny);

@@ -1,4 +1,29 @@
+# version 1.8-21
+
+## bug fixes
+
+- `sieve` failed with large rasters [#1729](https://github.com/rspatial/terra/issues/1729) by Reed Humphrey
+- `extractRange` only worked for SpatVector, not for matrix or vector [#1733](https://github.com/rspatial/terra/issues/1733) by Victor Van der Meersch
+- `extract<SpatRaster>` over https with a multilayer SpatRaster returned the values for the first layer for all layer [#1736](https://github.com/rspatial/terra/issues/1736) by Shannon Albeke
+
+## enhancements
+
+- new argument xyz="" to the `rast<SpatVector>` method
+- new arguments "type" and "breaks" to `plet<SpatRaster>` method [#1187](https://github.com/rspatial/terra/issues/1187) by Augustin Lobo
+- new argument "cores" in `lapp<SpatRasterDataset>` [#1190](https://github.com/rspatial/terra/issues/1190) by kel44
+- `aggregate<SpatRaster>` now handles `fun="table"` [#1662](https://github.com/rspatial/terra/issues/1662) by Fernando Aramburu.
+
+## new
+
+- `is.flipped<SpatRaster>` method  [#1627](https://github.com/rspatial/terra/issues/1627)>` by Timothée Giraud
+- `as.array<SpatRasterDataset>` method
+- `distance<SpatRaster,missing>` now has argument "values". If TRUE, the values of the nearest non-target cell is returned instead of the distance [#1243](https://github.com/rspatial/terra/issues/1243) by Simon Dedman
+- `thresh<SpatRaster>` [#1233](https://github.com/rspatial/terra/issues/1233) by Agustin Lobo
+
+
 # version 1.8-15
+
+Released 2025-01-24
 
 ## bug fixes
 
