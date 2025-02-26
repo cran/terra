@@ -85,12 +85,16 @@ rgb2hex <- function(x) {
     .Call(`_terra_percRank`, x, y, minc, maxc, tail)
 }
 
-.setGDALCacheSizeMB <- function(x) {
-    invisible(.Call(`_terra_setGDALCacheSizeMB`, x))
+.clearVSIcache <- function(vsi) {
+    invisible(.Call(`_terra_clearVSIcache`, vsi))
 }
 
-.getGDALCacheSizeMB <- function() {
-    .Call(`_terra_getGDALCacheSizeMB`)
+.setGDALCacheSizeMB <- function(x, vsi) {
+    invisible(.Call(`_terra_setGDALCacheSizeMB`, x, vsi))
+}
+
+.getGDALCacheSizeMB <- function(vsi) {
+    .Call(`_terra_getGDALCacheSizeMB`, vsi)
 }
 
 .get_proj_search_paths <- function() {

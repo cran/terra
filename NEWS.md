@@ -1,4 +1,27 @@
+# version 1.8-29
+
+## bug fixes
+
+- `cover<SpatRaster>` did not work well if multiple replacement values were supplied [#1741](https://github.com/rspatial/terra/issues/1741) by Tim Howard
+- `ext<-<SpatRaster,SpatExtent>` made a shallow copy. Reported on [SO 79440691](https://stackoverflow.com/questions/79440691/extent-is-rewritten-for-separate-spatraster-when-modifying-extent-using-terra-in/79440823#79440823) by katefull06 and as [#1743](https://github.com/rspatial/terra/issues/1743) by Agustin Lobo
+- `extract<SpatRaster>` with cells only used the NA flag for the first data source. [GSE 490433] (https://gis.stackexchange.com/questions/490433/problem-extracting-values-from-raster-in-r-with-terra-package) by MartinL
+
+
+## enhancements
+
+- `spatSample<SpatRaster>` and `spatSample<SpatExtent>` gain argument "exact=FALSE" to request the exact (but perhaps less regular) sample size for a regular sample. Currently pnly for planar crs.
+- `spatSample<SpatRaster>` gains argument "each=TRUE" to request, when using stratified sampling, a sample size for each stratum, or for all strata combined.
+- `focal` now maintains categories with "fun=modal", "min", "max", or "first" [SO 79449904](https://stackoverflow.com/questions/79449904/preserving-original-categories-when-using-terrafocal) by Sophie Père
+
+
+## new
+
+- `clearVSIcache`. Suggested by Shannon Albeke
+
+
 # version 1.8-21
+
+Released 2025-02-10
 
 ## bug fixes
 
@@ -15,7 +38,7 @@
 
 ## new
 
-- `is.flipped<SpatRaster>` method  [#1627](https://github.com/rspatial/terra/issues/1627)>` by Timothée Giraud
+- `is.flipped<SpatRaster>` method  [#1627](https://github.com/rspatial/terra/issues/1627) by Timothée Giraud
 - `as.array<SpatRasterDataset>` method
 - `distance<SpatRaster,missing>` now has argument "values". If TRUE, the values of the nearest non-target cell is returned instead of the distance [#1243](https://github.com/rspatial/terra/issues/1243) by Simon Dedman
 - `thresh<SpatRaster>` [#1233](https://github.com/rspatial/terra/issues/1233) by Agustin Lobo

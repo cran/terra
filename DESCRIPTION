@@ -1,8 +1,8 @@
 Package: terra
 Type: Package
 Title: Spatial Data Analysis
-Version: 1.8-21
-Date: 2025-02-09
+Version: 1.8-29
+Date: 2025-02-25
 Depends: R (>= 3.5.0)
 Suggests: parallel, tinytest, ncdf4, sf (>= 0.9-8), deldir, XML,
         leaflet (>= 2.2.1), htmlwidgets
@@ -31,7 +31,7 @@ Authors@R: c(
     person("Barry", "Rowlingson", role="ctb"),
     person("Michael D.", "Sumner", role="ctb"))
 NeedsCompilation: yes
-Packaged: 2025-02-10 03:30:17 UTC; rhijm
+Packaged: 2025-02-26 01:29:49 UTC; rhijm
 Author: Robert J. Hijmans [cre, aut] (<https://orcid.org/0000-0001-5872-2872>),
   Márcia Barbosa [ctb],
   Roger Bivand [ctb] (<https://orcid.org/0000-0003-2392-6140>),
@@ -43,4 +43,4 @@ Author: Robert J. Hijmans [cre, aut] (<https://orcid.org/0000-0001-5872-2872>),
   Barry Rowlingson [ctb],
   Michael D. Sumner [ctb]
 Repository: CRAN
-Date/Publication: 2025-02-10 05:30:02 UTC
+Date/Publication: 2025-02-26 08:10:02 UTC
