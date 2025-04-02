@@ -462,20 +462,24 @@ SpatRaster SpatRaster::warper(SpatRaster x, std::string crs, std::string method,
 	size_t ns = nsrc();
 	bool fixext = false;
 	for (size_t j=0; j<ns; j++) {
-		if (source[j].extset && (!source[j].memory)) {
+		if ((source[j].extset || source[j].flipped) && (!source[j].memory)) {
 			fixext = true;
 			break;
 		}
 	}
+
 	if (fixext) {
 		SpatRaster r = *this;
+		SpatOptions xopt(opt);
+		xopt.ncopies = std::max((size_t) 10, xopt.ncopies*2);
 		for (size_t j=0; j<ns; j++) {
-			if (r.source[j].extset && (!r.source[j].memory)) {
-				SpatRaster tmp(source[j]);
-				//if (tmp.canProcessInMemory(opt)) {
-				//	tmp.readAll();
-				//} else {
-				tmp = tmp.writeTempRaster(opt);
+			if ((source[j].extset || source[j].flipped) && (!r.source[j].memory)) {
+				SpatRaster tmp(source[j]);	
+				if (tmp.canProcessInMemory(xopt)) {
+					tmp.readAll();
+				} else {
+					tmp = tmp.writeTempRaster(opt);
+				}
 				r.source[j] = tmp.source[0]; 
 			}
 		}
@@ -931,7 +935,7 @@ SpatRaster SpatRaster::warper_by_util(SpatRaster x, std::string crs, std::string
 	size_t ns = nsrc();
 	bool fixext = false;
 	for (size_t j=0; j<ns; j++) {
-		if (source[j].extset && (!source[j].memory)) {
+		if ((source[j].extset || source[j].flipped) && (!source[j].memory)) {
 			fixext = true;
 			break;
 		}
@@ -939,7 +943,7 @@ SpatRaster SpatRaster::warper_by_util(SpatRaster x, std::string crs, std::string
 	if (fixext) {
 		SpatRaster r = *this;
 		for (size_t j=0; j<ns; j++) {
-			if (r.source[j].extset && (!r.source[j].memory)) {
+			if ((r.source[j].extset || r.source[j].flipped) && (!r.source[j].memory)) {
 				SpatRaster tmp(source[j]);
 				//if (tmp.canProcessInMemory(opt)) {
 				//	tmp.readAll();
@@ -1246,7 +1250,7 @@ SpatRaster SpatRaster::resample(SpatRaster x, std::string method, bool mask, boo
 			return out;
 			#endif
 		}
-		std::vector<std::vector<double>> e = extractXY(xy[0], xy[1], method, false);
+		std::vector<std::vector<double>> e = extractXY(xy[0], xy[1], method, false, opt);
 		std::vector<double> v = flatten(e);
 		if (!out.writeValues(v, out.bs.row[i], out.bs.nrows[i])) return out;
 	}
@@ -1280,7 +1284,7 @@ bool GCP_geotrans(GDALDataset *poDataset, double* adfGeoTransform) {
 //#include <filesystem>
 
 SpatRaster SpatRaster::rectify(std::string method, SpatRaster aoi, unsigned useaoi, bool snap, SpatOptions &opt) {
-	SpatRaster out = geometry(0);
+	SpatRaster out = geometry();
 
 	if (nsrc() > 1) {
 		out.setError("you can rectify only one data source at a time");
@@ -1343,7 +1347,7 @@ SpatRaster SpatRaster::rectify(std::string method, SpatRaster aoi, unsigned usea
 			out.setExtent(en, false, true, "");
 		}
 	} else if (useaoi == 2){  // extent and resolution
-		out = aoi.geometry(0);
+		out = aoi.geometry();
 	} // else { // if (useaoi == 0) // no aoi
 
 	//e = out.getExtent();
@@ -1382,7 +1386,7 @@ SpatVector SpatRaster::polygonize(bool round, bool values, bool narm, bool aggre
 	if (round && (digits > 0)) {
 		tmp = tmp.math2("round", digits, topt);
 		round = false;
-	} else if (tmp.source[0].extset) { 
+	} else if (tmp.source[0].extset || tmp.source[0].flipped) { 
 		tmp = tmp.hardCopy(topt);
 	}
 
@@ -1485,7 +1489,7 @@ SpatVector SpatRaster::polygonize(bool round, bool values, bool narm, bool aggre
 
 	std::vector<double> fext;
 	SpatVector fvct;
-	out.read_ogr(poDS, "", "", fext, fvct, false, "");
+	out.read_ogr(poDS, "", "", fext, fvct, false, "", "");
 	GDALClose(poDS);
 
 	if (aggregate && (out.nrow() > 0)) {
@@ -1517,7 +1521,7 @@ SpatRaster SpatRaster::rgb2col(size_t r,  size_t g, size_t b, SpatOptions &opt) 
 	SpatOptions ops(opt);
 	SpatRaster tmp = subset(lyrs, ops);
 
-	if (source[0].extset) {
+	if (source[0].extset || source[0].flipped) {
 		SpatOptions topt(opt);
 		tmp = tmp.hardCopy(topt);
 		return tmp.rgb2col(r, g, b, opt);
@@ -1618,7 +1622,7 @@ SpatRaster SpatRaster::rgb2col(size_t r,  size_t g, size_t b, SpatOptions &opt) 
 	}
 	GDALClose(hDstDS);
 	if (driver != "MEM") {
-		out = SpatRaster(filename, {-1}, {""}, {}, {});
+		out = SpatRaster(filename, {-1}, {""}, {}, {}, {});
 	}
 	return out;
 }
@@ -1726,7 +1730,7 @@ SpatRaster SpatRaster::viewshed(const std::vector<double> obs, const std::vector
 		GDALClose(hDstDS);
 		GDALClose(hSrcDS);
 		CSLDestroy( papszOptions );
-		out = SpatRaster(filename, {-1}, {""}, {}, {});
+		out = SpatRaster(filename, {-1}, {""}, {}, {}, {});
 	} else {
 		GDALClose(hSrcDS);
 		CSLDestroy( papszOptions );
@@ -1775,7 +1779,7 @@ SpatRaster SpatRaster::proximity(double target, double exclude, bool keepNA, std
 		return out;
 	}
 	
-	if (source[0].extset) { 
+	if (source[0].extset || source[0].flipped) { 
 		SpatOptions topt(opt);
 		SpatRaster etmp;
 		if (nlyr() > 1) {
@@ -1912,7 +1916,7 @@ SpatRaster SpatRaster::proximity(double target, double exclude, bool keepNA, std
 			GDALSetRasterStatistics(hTargetBand, adfMinMax[0], adfMinMax[1], -9999, -9999);
 		}
 		GDALClose(hDstDS);
-		out = SpatRaster(fname, {-1}, {""}, {}, {});
+		out = SpatRaster(fname, {-1}, {""}, {}, {}, {});
 	}
 	
 	if (mask) {
@@ -1947,7 +1951,7 @@ SpatRaster SpatRaster::sieveFilter(int threshold, int connections, SpatOptions &
 	}
 	
 		
-	if (source[0].extset) { 
+	if (source[0].extset || source[0].flipped) { 
 		SpatOptions topt(opt);
 		SpatRaster etmp = hardCopy(topt);
 		return etmp.sieveFilter(threshold, connections, opt);
@@ -2012,11 +2016,11 @@ SpatRaster SpatRaster::sieveFilter(int threshold, int connections, SpatOptions &
 
 	} else {
 		GDALClose(hDstDS);
-		out = SpatRaster(tmp_filename, {-1}, {""}, {}, {});
+		out = SpatRaster(tmp_filename, {-1}, {""}, {}, {}, {});
 	}
 	
 	opt.names = getNames();
-	out.source[0].source_name = {""};
+	out.source[0].source_name = "";
 	return out.mask(mask, false, 0, NAN, opt);
 }
 
@@ -2353,7 +2357,7 @@ SpatRaster SpatRaster::fillNA(double missing, double maxdist, int niter, SpatOpt
 	GDALComputeRasterMinMax(hTargetBand, true, adfMinMax);
 	GDALSetRasterStatistics(hTargetBand, adfMinMax[0], adfMinMax[1], -9999, -9999);
 	GDALClose(hDstDS);
-	return SpatRaster(filename, {-1}, {""}, {}, {});
+	return SpatRaster(filename, {-1}, {""}, {}, {}, {});
 }
 
 

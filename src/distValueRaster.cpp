@@ -243,10 +243,10 @@ SpatRaster SpatRaster::distance_crds_vals(std::vector<double>& x, std::vector<do
 	}
 
 
-	unsigned nc = ncol();
+	size_t nc = ncol();
 	if (nrow() > 1000) {
 		opt.steps = std::max(opt.steps, (size_t) 4);
-		opt.progress = opt.progress * 1.5;
+		opt.progress = opt.progress * 2;
 	}
 	
  	if (!out.writeStart(opt, filenames())) {
@@ -267,7 +267,7 @@ SpatRaster SpatRaster::distance_crds_vals(std::vector<double>& x, std::vector<do
 		for (double &d : tox) d *= toRad;
 	}
 
-	double oldfirst = 0;
+	size_t oldfirst = 0;
 	size_t first = 0;
 	size_t last  = x.size();
 

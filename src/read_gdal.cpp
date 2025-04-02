@@ -256,14 +256,14 @@ bool GetVAT(std::string filename, SpatCategories &vat) {
 	SpatVector v, fvct;
 	std::vector<double> fext;
 
-	v.read(filename, "", "", fext, fvct, false, "", {}); 
+	v.read(filename, "", "", fext, fvct, false, "", "", {}); 
 	if (v.df.nrow() == 0) return false;
 
 
 	std::vector<std::string> nms = v.df.get_names();
 	std::vector<std::string> ss = {"count", "histogram"};
 
-	std::vector<unsigned> rng;
+	std::vector<size_t> rng;
 	rng.reserve(nms.size());
 
 	for (size_t i=0; i<nms.size(); i++) {
@@ -616,7 +616,7 @@ std::vector<std::string> get_metadata(std::string filename, std::vector<std::str
 }
 
 
-SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool useids, std::vector<std::string> options) {
+SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool useids, std::vector<std::string> options, std::vector<std::string> domains) {
 
     GDALDataset *poDataset = openGDAL(fname, GDAL_OF_RASTER | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR, {}, {});
     if( poDataset == NULL )  {
@@ -661,7 +661,7 @@ SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool u
 			if (pos != std::string::npos) {
 				s.erase(0, pos + delim.length());
 				SpatRaster sub;
-				if (sub.constructFromFile(s, {-1}, {""}, {}, options, false)) {
+				if (sub.constructFromFile(s, {-1}, {""}, {}, options, false,  domains)) {
 					std::string sname = sub.source[0].source_name.empty() ? basename_sds(s) : sub.source[0].source_name;
 					if (!push_back(sub, sname, sub.source[0].source_name_long, sub.source[0].unit[0], true)) {
 						addWarning("skipped (different geometry): " + s);
@@ -684,12 +684,12 @@ SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool u
 	std::vector<std::string> tagnames, tagvalues;
 //	get_tags(meta, "NC_GLOBAL#TAG_", tagnames, tagvalues);
 	get_tags(meta, "NC_GLOBAL#", tagnames, tagvalues);
-	for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i]);
+	for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i], "GLOBAL");
 
 }
 
 
-SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> ids, bool useids, std::vector<std::string> options) {
+SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> ids, bool useids, std::vector<std::string> options, std::vector<std::string> domains) {
 
 //	std::vector<std::string> ops;
     GDALDataset *poDataset = openGDAL(fname, GDAL_OF_RASTER | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR, {}, {});
@@ -735,7 +735,7 @@ SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> i
 			if (pos != std::string::npos) {
 				s.erase(0, pos + delim.length());
 				SpatRaster sub;
-				if (sub.constructFromFile(s, {-1}, {""}, {}, options, false)) {
+				if (sub.constructFromFile(s, {-1}, {""}, {}, options, false, domains)) {
 					push_back(sub, basename_sds(s));
 				} else {
 					addWarning("skipped (fail): " + s);
@@ -755,7 +755,7 @@ SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> i
 	std::vector<std::string> tagnames, tagvalues;
 //	get_tags(meta, "NC_GLOBAL#TAG_", tagnames, tagvalues);
 	get_tags(meta, "NC_GLOBAL#", tagnames, tagvalues);
-	for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i]);
+	for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i], "GLOBAL");
 
 }
 
@@ -826,7 +826,9 @@ bool getGCPs(GDALDataset *poDataset, SpatRasterSource &s) {
 
 
 
-bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip) {
+bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip, std::vector<std::string> domains) {
+
+
 
 	if (fname == "WCS:") {
 		// for https://github.com/rspatial/terra/issues/1505
@@ -866,28 +868,29 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 			meta.push_back(metasds[i]);
 		}
 		GDALClose( (GDALDatasetH) poDataset );
-		return constructFromSDS(fname, meta, subds, subdsname, options, gdrv, noflip);
+		return constructFromSDS(fname, meta, subds, subdsname, options, gdrv, noflip, domains);
 
 	} else if (nl==0) {
 		setError("no raster data in " + fname);
 		return false;
 	}
 
-	char **meterra = poDataset->GetMetadata("USER_TAGS");
-
-	if (meterra != NULL) {
-		std::vector<std::string> meta;
-		for (size_t i=0; meterra[i] != NULL; i++) {
-			std::string s = meterra[i];
-			size_t pos = s.find("=");
-			if (pos != std::string::npos) {
-				std::string name = s.substr(0, pos);
-				std::string value = s.substr(pos+1); 
-				addTag(name, value);
+	for (size_t i=0; i<domains.size(); i++) {
+		char **meterra = poDataset->GetMetadata(domains[i].c_str());
+		if (meterra != NULL) {
+			std::vector<std::string> meta;
+			for (size_t j=0; meterra[j] != NULL; j++) {
+				std::string s = meterra[j];
+				size_t pos = s.find("=");
+				if (pos != std::string::npos) {
+					std::string name = s.substr(0, pos);
+					std::string value = s.substr(pos+1); 
+					addTag(name, value, domains[i]);
+				}
 			}
 		}
 	}
-
+	
 	SpatRasterSource s;
 
 	char **metasrc = poDataset->GetMetadata();
@@ -905,7 +908,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 	double adfGeoTransform[6];
 
 	bool hasExtent = true;
-	if( poDataset->GetGeoTransform( adfGeoTransform ) == CE_None ) {
+	if (poDataset->GetGeoTransform( adfGeoTransform ) == CE_None) {
 
 		double xmin = adfGeoTransform[0]; /* left x */
 		double xmax = xmin + adfGeoTransform[1] * s.ncol; /* w-e resolution */
@@ -916,6 +919,8 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 
 		if (adfGeoTransform[5] > 0) {
 			std::swap(ymin, ymax);
+			s.extset = true;
+			s.flipped = true;
 		}
 
 		SpatExtent e(xmin, xmax, ymin, ymax);
@@ -976,15 +981,15 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 		s.crs = "";
 	}
 */
-
-
 	std::string crs = getDsWKT(poDataset);
+
 	if (crs.empty()) {
 		if (hasExtent && s.extent.xmin >= -180 && s.extent.xmax <= 360 && s.extent.ymin >= -90 && s.extent.ymax <= 90) {
 			crs = "OGC:CRS84";
 			s.parameters_changed = true;
 		}
 	}
+
 	std::string msg;
 	if (!s.srs.set(crs, msg)) {
 		addWarning(msg);
@@ -1275,11 +1280,11 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 
 			bool lat = false;
 			bool lon = false;
-			for (size_t i=0; i<metadata.size(); i++) {
-				if (!lat) lat = metadata[i].find("long_name=latitude");
-				if (!lon) lon = metadata[i].find("long_name=longitude");
+			for (size_t i=0; i<metadata.size(); i++) {				
+				if (!lat) lat = metadata[i].find("long_name=latitude") != std::string::npos;
+				if (!lon) lon = metadata[i].find("long_name=longitude") != std::string::npos;
 			}
-			if (lon && lat) {
+			if (lon && lat && s.extent.ymin > -91 && s.extent.ymax < 91 && s.extent.xmin > -361  && s.extent.xmax < 361) {
 				if (s.srs.set("+proj=longlat", msg)) {
 					s.parameters_changed = true;
 				}
@@ -1305,7 +1310,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 //		std::string stag = s.source_name + "#TAG_";
 		std::string stag = s.source_name + "#";
 		get_tags(metadata, stag, tagnames, tagvalues);
-		for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i]);
+		for (size_t i=0; i<tagnames.size(); i++) addTag(tagnames[i], tagvalues[i], gdrv);
 
 	}
 	if (getCols) {
@@ -1969,7 +1974,7 @@ void ncdf_pick_most(std::vector<std::string> &sd, std::vector<std::string> &varn
 
 
 
-bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string> meta, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> options, std::string driver, bool noflip) {
+bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string> meta, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> options, std::string driver, bool noflip, std::vector<std::string> domains) {
 
 	bool ncdf = driver =="netCDF";
 	bool gtiff = driver == "GTiff";
@@ -2063,7 +2068,7 @@ bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string>
 	size_t cnt;
 
     for (cnt=0; cnt < sd.size(); cnt++) {
-		if (constructFromFile(sd[cnt], {-1}, {""}, {}, options, noflip)) break;
+		if (constructFromFile(sd[cnt], {-1}, {""}, {}, options, noflip, domains)) break;
 	}
 //	source[0].source_name = srcname[cnt];
 
@@ -2074,7 +2079,7 @@ bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string>
 	SpatOptions opt;
     for (size_t i=(cnt+1); i < sd.size(); i++) {
 //		printf( "%s\n", sd[i].c_str() );
-		bool success = out.constructFromFile(sd[i], {-1}, {""}, {}, options, noflip);
+		bool success = out.constructFromFile(sd[i], {-1}, {""}, {}, options, noflip, domains);
 		if (success) {
 			if (out.compare_geom(*this, false, false, 0.1)) {
 //				out.source	[0].source_name = srcname[i];
@@ -2119,7 +2124,7 @@ bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string>
 		for (size_t i=0; i<tagnames.size(); i++) {
 			std::string mn = tagnames[i];
 			if (!((mn == "_FillValue") || (mn == "grid_mapping") || (mn == "Conventions") || (mn == "created_by") || (mn == "created_date"))) {
-				addTag(tagnames[i], tagvalues[i]);
+				addTag(tagnames[i], tagvalues[i], driver);
 			}
 		}
 	}
@@ -2372,6 +2377,8 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 }
 
 
+
+
 //NETCDF_DIM_k=0
 //NETCDF_DIM_tile=0
 //NETCDF_DIM_time=0
@@ -2379,11 +2386,10 @@ std::vector<int_64> ncdf_time(const std::vector<std::string> &metadata, std::vec
 
 
 
+void ncdf_names(const std::vector<std::vector<std::string>> &m, std::vector<std::vector<std::string>> &out, std::vector<double> &depth, bool &has_depth, std::string &depth_name) {
 
-std::vector<std::vector<std::string>> ncdf_names(const std::vector<std::vector<std::string>> &m) {
-
-	std::vector<std::vector<std::string>> out(3);
-	if (m.empty()) return out;
+	out.resize(3);
+	if (m.empty()) return;
 
 	std::string vname, lname, units = "";
 	std::vector<std::string> b = m[0];
@@ -2427,17 +2433,73 @@ std::vector<std::vector<std::string>> ncdf_names(const std::vector<std::vector<s
 				}
 			}
 		}
+		size_t pos = dim.find("=");
+		double v;
+		if (pos != std::string::npos) {
+			if (i == 0) {
+				depth_name = dim.substr(1, pos-1);
+			}
+			std::string dim2 = dim;
+			dim2.erase(0, pos+1);
+			try {
+				v = std::stod(dim2);
+			} catch(...) {
+				v = NAN;
+				has_depth = false;
+			}	
+			depth.push_back(v);
+		} else {
+			has_depth = false;
+		}
 		out[1].push_back(vname + dim);
 	}
 
-	return out;
+	return;
 }
+
 
 void SpatRasterSource::set_names_time_ncdf(std::vector<std::string> metadata, std::vector<std::vector<std::string>> bandmeta, std::string &msg) {
 
 	if (bandmeta.empty()) return;
-	std::vector<std::vector<std::string>> nms = ncdf_names(bandmeta);
 
+/*
+	for (size_t i=0; i<bandmeta.size(); i++) {
+		for (size_t j=0; j < bandmeta[i].size(); j++) {
+			Rcpp::Rcout << bandmeta[i][j] << " ";
+		}
+		Rcpp::Rcout << std::endl;
+	}
+*/
+
+	std::vector<std::vector<std::string>> nms;
+	std::vector<double> mdepth;
+	bool hasdepth = true;
+	ncdf_names(bandmeta, nms, mdepth, hasdepth, depthname);
+	
+
+/*
+	for (size_t i=0; i<nms.size(); i++) {
+		for (size_t j=0; j<nms[i].size(); j++) {
+			Rcpp::Rcout << nms[i][j] << " ";
+		}
+		Rcpp::Rcout << std::endl;
+	}
+*/
+	
+	if (hasdepth) {
+		depth = mdepth;
+		hasDepth = true;
+		std::string pattern = depthname+"#units=";
+		for (size_t i=0; i<metadata.size(); i++) {
+			std::size_t found = metadata[i].find(pattern);
+			if (found != std::string::npos) {
+				depthunit = metadata[i];
+				depthunit.erase(depthunit.begin(), depthunit.begin()+pattern.size());
+				break;
+			}
+		}
+	}
+	
 	if (!nms[1].empty()) {
 		names = nms[1];
 		make_unique_names(names);

@@ -365,7 +365,7 @@ SpatRaster SpatRaster::rasterizeGeom(SpatVector x, std::string unit, std::string
 
 
 SpatRaster SpatRaster::hardCopy(SpatOptions &opt) {
-	SpatRaster out = geometry(-1, true, true);
+	SpatRaster out = geometry(nlyr(), true, true);
 	if (!hasValues()) {
 		out.addWarning("raster has no values");
 		return out;
@@ -559,7 +559,7 @@ SpatRaster SpatRaster::rasterizeLyr(SpatVector x, double value, double backgroun
 
 	GDALClose(rstDS);
 	if (driver != "MEM") {
-		out = SpatRaster(filename, {-1}, {""}, {}, {});
+		out = SpatRaster(filename, {-1}, {""}, {}, {}, {});
 	}
 	return out;
 }

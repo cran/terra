@@ -39,10 +39,19 @@
 #endif
 
 
+
+// [[Rcpp::export(name = ".have_TBB")]]
+bool have_TBB() {
+	#ifdef HAVE_TBB
+		return true;
+	#else 
+		return false;
+	#endif 
+}
+
+
 //from sf
-
 #ifdef projh
-
 // [[Rcpp::export]]
 std::string proj_version() {
 	std::stringstream buffer;
@@ -271,7 +280,7 @@ std::vector<std::vector<std::string>> gdal_drivers() {
     GDALDriver *poDriver;
     char **papszMetadata;
 	for (size_t i=0; i<n; i++) {
-	    poDriver = GetGDALDriverManager()->GetDriver(i);
+	    poDriver = GetGDALDriverManager()->GetDriver((int)i);
 		const char* ss = poDriver->GetDescription();
 		if (ss != NULL ) s[0][i] = ss;
 		ss = poDriver->GetMetadataItem( GDAL_DMD_LONGNAME );
@@ -446,7 +455,7 @@ std::vector<double> percRank(std::vector<double> x, std::vector<double> y, doubl
 					break;
 				}
 			}
-			double z = (b + 0.5 * t) / nx;
+			double z = ((double)b + 0.5 * (double)t) / (double) nx;
 			if (tail == 1) { // both
 				if (z > 0.5) {
 					z = 2 * (1 - z);
@@ -482,7 +491,7 @@ void clearVSIcache(bool vsi) {
 // [[Rcpp::export(name = ".setGDALCacheSizeMB")]]
 void setGDALCacheSizeMB(double x, bool vsi) {
 	if (vsi) {
-		int64_t v = x * 1024 * 1024;
+		int64_t v = int64_t(x * 1024 * 1024);
 		CPLSetConfigOption("CPL_VSIL_CURL_CACHE_SIZE", std::to_string(v).c_str());
 	} else {
 		GDALSetCacheMax64(static_cast<int64_t>(x) * 1024 * 1024);
@@ -557,6 +566,7 @@ bool set_proj_search_paths(std::vector<std::string> paths) {
 #endif
 }
 
+
 // [[Rcpp::export(name = ".PROJ_network")]]
 std::string PROJ_network(bool enable, std::string url) {
 	std::string s = "";
@@ -590,8 +600,8 @@ double pearson_cor(std::vector<double> x, std::vector<double> y, bool narm) {
 		}
 	}
 	size_t n = x.size();
-	double xbar = accumulate(x.begin(), x.end(), 0.0) / n;
-	double ybar = accumulate(y.begin(), y.end(), 0.0) / n;
+	double xbar = accumulate(x.begin(), x.end(), 0.0) / (double)n;
+	double ybar = accumulate(y.begin(), y.end(), 0.0) / (double)n;
 	double numer = 0;
 	for (size_t i=0; i<n; i++) {
 		numer += (x[i]-xbar) * (y[i]-ybar);
@@ -654,7 +664,7 @@ Rcpp::IntegerMatrix uniqueSymmetricRows(std::vector<size_t> x, std::vector<size_
 	size_t n = x.size();
 	for (size_t i=0; i<n; i++) {
 		if (x[i] > y[i]) {
-			double tmp = x[i];
+			size_t tmp = x[i];
 			x[i] = y[i];
 			y[i] = tmp;
 		}

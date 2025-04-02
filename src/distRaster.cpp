@@ -29,7 +29,7 @@
 #include "sort.h"
 #include "geosphere.h"
 
-
+/*
 inline void shortDistPoints(std::vector<double> &d, const std::vector<double> &x, const std::vector<double> &y, const std::vector<double> &px, const std::vector<double> &py, const bool& lonlat, const std::string& method, const double &lindist) {
 	if (lonlat) {
 		distanceToNearest_lonlat(d, x, y, px, py, lindist, method);
@@ -37,6 +37,7 @@ inline void shortDistPoints(std::vector<double> &d, const std::vector<double> &x
 		distanceToNearest_plane(d, x, y, px, py, lindist);
 	}
 }
+*/
 
 inline void shortDirectPoints(std::vector<double> &d, std::vector<double> &x, std::vector<double> &y, std::vector<double> &px, std::vector<double> &py, const bool& lonlat, bool &from, bool &degrees, const std::string &method) {
 	if (lonlat) {
@@ -264,10 +265,10 @@ SpatRaster SpatRaster::distance_crds(std::vector<double>& x, std::vector<double>
 		return(out);
 	}
 
-	unsigned nc = ncol();
+	size_t nc = ncol();
 	if (nrow() > 1000) {
 		opt.steps = std::max(opt.steps, (size_t) 4);
-		opt.progress = opt.progress * 1.5;
+		opt.progress = opt.progress * 2;
 	}
 	
  	if (!out.writeStart(opt, filenames())) {
@@ -288,7 +289,7 @@ SpatRaster SpatRaster::distance_crds(std::vector<double>& x, std::vector<double>
 		for (double &d : tox) d *= toRad;
 	}
 
-	double oldfirst = 0;
+	size_t oldfirst = 0;
 	size_t first = 0;
 	size_t last  = x.size();
 
@@ -372,15 +373,14 @@ SpatRaster SpatRaster::distance_vector(SpatVector p, bool rasterize, std::string
 		out.setError("invalid unit. Must be 'm' or 'km'");
 		return(out);
 	}
+	if ((method != "geo") && (method != "cosine") && (method != "haversine")) {
+		out.setError("invalid method. Must be 'geo', 'haversine' or 'cosine'");
+		return(out);
+	}
 
 	if (rasterize) {
 //SpatRaster SpatRaster::distance_rasterize(SpatVector p, double target, double exclude, std::string unit, const std::string& method, SpatOptions &opt) {
 //		double target = NAN;
-
-		if ((method != "geo") && (method != "cosine") && (method != "haversine")) {
-			out.setError("invalid method. Must be 'geo', 'cosine' or 'haversine'");
-			return(out);
-		}
 
 		double exclude = NAN;
 
@@ -418,18 +418,13 @@ SpatRaster SpatRaster::distance_vector(SpatVector p, bool rasterize, std::string
 	} else {
 
 		if ((p.type() == "polygons") || (p.type() == "lines")) {
-
-			if ((method != "geo") && (method != "cosine")) {
-				out.setError("invalid method. Must be 'geo' or 'cosine'");
-				return(out);
-			}
 			
 			if (p.nrow() > 1) {
 				p = p.aggregate(true);
 			}
 			
 			std::vector<double> cells;
-			unsigned nc = ncol();
+			size_t nc = ncol();
 
 			if (!readStart()) {
 				out.setError(getError());
@@ -447,7 +442,7 @@ SpatRaster SpatRaster::distance_vector(SpatVector p, bool rasterize, std::string
 				SpatVector pnts;
 				pnts.srs = source[0].srs;
 				pnts.setPointsGeometry(rxy[0], rxy[1]);
-				std::vector<double> d = pnts.distance(p, false, unit, method);
+				std::vector<double> d = pnts.distance(p, false, unit, method, false, opt);
 					
 				if (!out.writeBlock(d, i)) return out;
 			}
@@ -508,7 +503,7 @@ SpatRaster SpatRaster::direction_rasterize(SpatVector p, bool from, bool degrees
 		out.setError("no locations to compute from");
 		return(out);
 	}
-	unsigned nc = ncol();
+	size_t nc = ncol();
 	if (!readStart()) {
 		out.setError(getError());
 		return(out);
@@ -584,7 +579,7 @@ SpatRaster SpatRaster::distance_vector(SpatVector p, std::string unit, SpatOptio
 	p = p.aggregate(false);
 
 //	bool lonlat = is_lonlat(); // m == 0
-	unsigned nc = ncol();
+	size_t nc = ncol();
 
  	if (!out.writeStart(opt, filenames())) {
 		readStop();
@@ -660,7 +655,7 @@ SpatRaster SpatRaster::distance(double target, double exclude, bool keepNA, std:
 				return out.init({0}, opt);
 			}
 			if (values) {
-				std::vector<std::vector<double>> vv = extractXY(p[0], p[1], "", false);
+				std::vector<std::vector<double>> vv = extractXY(p[0], p[1], "", false, opt);
 				return distance_crds_vals(p[0], p[1], vv[0], method, true, setNA, unit, threshold, opt);				
 			} else {
 				return distance_crds(p[0], p[1], method, true, setNA, unit, threshold, opt);
@@ -685,7 +680,7 @@ SpatRaster SpatRaster::distance(double target, double exclude, bool keepNA, std:
 		return out.init({0}, opt);
 	}
 	if (values) {
-		std::vector<std::vector<double>> vv = extractXY(p[0], p[1], "", false);
+		std::vector<std::vector<double>> vv = extractXY(p[0], p[1], "", false, opt);
 		out = out.distance_crds_vals(p[0], p[1], vv[0], method, true, setNA, unit, threshold, opt);				
 	} else {
 		out = out.distance_crds(p[0], p[1], method, true, setNA, unit, threshold, opt);
@@ -751,8 +746,8 @@ inline double minCostDist(std::vector<double> &d) {
 }
 
 
-inline void DxDxyCost(const double &lat, const int &row, double xres, double yres, const int &dir, double &dx,  double &dy, double &dxy, double distscale, const double mult=2) {
-	double rlat = lat + row * yres * dir;
+inline void DxDxyCost(const double &lat, const size_t &row, double xres, double yres, const double &dir, double &dx,  double &dy, double &dxy, double distscale, const double mult=2) {
+	double rlat = lat + (double)row * yres * dir;
 	dx  = distance_lonlat(0, rlat, xres, rlat) / (mult * distscale);
 	yres *= -dir;
 	dy  = distance_lonlat(0, 0, 0, yres);
@@ -1321,8 +1316,8 @@ inline double minNArm(const double &a, const double &b) {
 }
 */
 
-inline void DxDxy(const double &lat, const int &row, const double &xres, double yres, const int &dir, const double &scale, double &dx,  double &dy, double &dxy) {
-	double rlat = lat + row * yres * dir;
+inline void DxDxy(const double &lat, const size_t &row, const double &xres, double yres, const double &dir, const double &scale, double &dx,  double &dy, double &dxy) {
+	double rlat = lat + (double)row * yres * dir;
 	dx  = distance_lonlat(0, rlat, xres, rlat) / scale;
 	yres *= -dir;
 	dy  = distance_lonlat(0, rlat, 0, rlat+yres);
@@ -2053,7 +2048,7 @@ SpatRaster SpatRaster::rst_area(bool mask, std::string unit, bool transform, int
 				out.writeStop();
 			}
 			if (resample) {
-				double divr = frow*fcol;
+				double divr = (double)(frow*fcol);
 				out = out.arith(divr, "/", false, false, xopt);
 				out = out.warper(target, "", "bilinear", false, false, true, opt);
 			}
@@ -2122,7 +2117,7 @@ std::vector<std::vector<double>> SpatRaster::sum_area(std::string unit, bool tra
 		if (!hasValues()) {
 			out.resize(1);
 			for (size_t i=0; i<ar.size(); i++) {
-				out[0] += ar[i] * nc;
+				out[0] += ar[i] * (double)nc;
 			}
 		} else {
 			for (size_t i=0; i<bs.n; i++) {
@@ -2475,7 +2470,7 @@ std::vector<std::vector<double>> SpatRaster::sum_area_group(SpatRaster group, st
 		for (auto& it1:m[i]) {
 			std::map<double, double> gm = it1.second;
 			for (auto& it2:gm) {
-				out[i].push_back(i);
+				out[i].push_back((double)i);
 				out[i].push_back(it1.first);
 				out[i].push_back(it2.first);
 				out[i].push_back(it2.second);
@@ -2715,7 +2710,7 @@ void do_roughness(std::vector<double> &val, const std::vector<double> &d, size_t
 		val.resize(val.size() + ncol, NAN);
 	}
 
-	int incol = ncol;
+	int incol = (int)ncol;
 	int a[9] = { -1-incol, -1, -1+incol, -incol, 0, incol, 1-incol, 1, 1+incol };
 	double min, max, v;
 	for (size_t row=1; row< (nrow-1); row++) {
@@ -2757,7 +2752,7 @@ void to_degrees(std::vector<double>& x, size_t start) {
 }
 
 
-void do_slope(std::vector<double> &val, const std::vector<double> &d, unsigned ngb, unsigned nrow, unsigned ncol, double dx, double dy, bool geo, std::vector<double> &gy, bool degrees, bool before, bool after) {
+void do_slope(std::vector<double> &val, const std::vector<double> &d, size_t ngb, size_t nrow, size_t ncol, double dx, double dy, bool geo, std::vector<double> &gy, bool degrees, bool before, bool after) {
 
 	size_t start = val.size();
 	if (!before) {
@@ -2881,7 +2876,7 @@ double dmod(double x, double n) {
 
 
 
-void do_aspect(std::vector<double> &val, const std::vector<double> &d, unsigned ngb, unsigned nrow, unsigned ncol, double dx, double dy, bool geo, std::vector<double> &gy, bool degrees, bool before, bool after) {
+void do_aspect(std::vector<double> &val, const std::vector<double> &d, size_t ngb, size_t nrow, size_t ncol, double dx, double dy, bool geo, std::vector<double> &gy, bool degrees, bool before, bool after) {
 
 	size_t start = val.size();
 	if (!before) {
@@ -3154,13 +3149,13 @@ SpatRaster SpatRaster::hillshade(SpatRaster aspect, std::vector<double> angle, s
 			nms = opt.names;
 		} else {
 			nms.reserve(nl);
-			for (unsigned i=0; i<nl; i++) {
+			for (size_t i=0; i<nl; i++) {
 				std::string nmi = "hs_" + double_to_string(angle[i]) + "_" + double_to_string(direction[i]);
 				nms.push_back(nmi);
 			}
 		}
 				
-		for (unsigned i=0; i<nl; i++) {
+		for (size_t i=0; i<nl; i++) {
 			ops.names = {nms[i]};
 			SpatRaster r = hillshade(aspect, {angle[i]}, {direction[i]}, normalize, ops);
 			out.source[i] = r.source[0];

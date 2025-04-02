@@ -692,7 +692,10 @@ setMethod("project", signature(x="SpatRaster"),
 			}
 		} else {
 			if (!is.character(y)) {
-				warn("project,SpatRaster", "argument y (the crs) should be a character value")
+				#warn("project,SpatRaster", "argument y (the crs) should be a character value")
+				if (inherits(y, "numeric")) {
+					error("project,SpatRaster", "argument y (the crs) cannot be a number.\nFor EPSG codes use this format 'epsg:1234'")				
+				}
 				y <- as.character(crs(y))
 			}
 			if (!is.null(res) || !is.null(origin)) {
@@ -1161,7 +1164,11 @@ setMethod("unique", signature(x="SpatRaster", incomparables="ANY"),
 
 		opt <- spatOptions()
 
-		if (as.raster) incomparables = FALSE
+		if (as.raster) {
+			if (nlyr(x) == 1) return(x)
+			incomparables = FALSE
+		}
+		
 		u <- x@pntr$unique(incomparables, digits, na.rm[1], opt)
 
 		if (!as.raster) {

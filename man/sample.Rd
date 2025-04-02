@@ -14,12 +14,12 @@ Take a spatial sample from a SpatRaster, SpatVector or SpatExtent. Sampling a Sp
 
 With a SpatRaster, you can get cell values, cell numbers (\code{cells=TRUE}), coordinates (\code{xy=TRUE}) or (when \code{method="regular"} and \code{as.raster=TRUE}) get a new SpatRaster with the same extent, but fewer cells. 
 
-In order to assure regularity when requesting a regular sample, the number of cells or points returned may not be exactly the same as the \code{size} requested.
+In order to assure regularity when requesting a regular sample, the number of cells or points returned may not be exactly the same as the \code{size} requested unless you use \code{exact=TRUE}.
 }
 
 \usage{
 \S4method{spatSample}{SpatRaster}(x, size, method="random", replace=FALSE, na.rm=FALSE, 
-    as.raster=FALSE, as.df=TRUE, as.points=FALSE, values=TRUE, cells=FALSE, 
+    as.raster=FALSE, as.df=TRUE, as.points=FALSE, values=hasValues(x), cells=FALSE, 
     xy=FALSE, ext=NULL, warn=TRUE, weights=NULL, exp=5, exhaustive=FALSE, 
 	exact=FALSE, each=TRUE)
 

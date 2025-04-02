@@ -25,7 +25,7 @@
 #include "math_utils.h"
 
 
-void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &out, size_t outstart, std::vector<int_64> &rows, std::vector<int_64> &cols) {
+void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &out, size_t outstart, std::vector<int_64> &rows, std::vector<int_64> &cols, SpatOptions &opt) {
 
 	std::vector<std::vector<double>> errout;
 	if (source[src].rotated) {
@@ -38,7 +38,6 @@ void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &o
 	size_t nc = rs.ncol();
 	size_t n = rows.size();
 
-	SpatOptions opt;
 	BlockSize bs = getBlockSize(opt);
 
 /*
@@ -51,14 +50,18 @@ void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &o
 	permute(rows, pm);
 	permute(cols, pm);
 */
+
+//for (size_t i=0; i<bs.n; i++) Rcpp::Rcout << bs.row[i] << " " << bs.nrows[i] << "; ";
+//Rcpp::Rcout << std::endl;
+
 	std::vector<int_64> urows = vunique(rows);
 	std::vector<bool> useblock(bs.n, false);
 	size_t jj = 0;
 	for (size_t i=0; i<bs.n; i++) {
 		int_64 st = bs.row[i];
-		int_64 ed = bs.row[i] + bs.nrows[i];
+		int_64 ed = bs.row[i] + bs.nrows[i] - 1;
 		for (size_t j=jj; j<urows.size(); j++) {
-			if ((urows[j] >= st) && (urows[j] < ed)) {
+			if ((urows[j] >= st) && (urows[j] <= ed)) {
 				useblock[i] = true;
 				bs.row[i] = urows[j];
 				for (size_t k=j; k<urows.size(); k++) {
@@ -66,7 +69,7 @@ void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &o
 						jj = k;
 						break;
 					} else {
-						bs.nrows[i] = k-jj+1;
+						bs.nrows[i] = urows[k]-urows[j]+1;
 					}
 				}
 				break;
@@ -74,6 +77,10 @@ void SpatRaster::readRowColBlock(size_t src, std::vector<std::vector<double>> &o
 		}
 	}
 	bs.nrows[bs.n-1] = urows[urows.size()-1] - bs.row[bs.n-1] + 1;
+
+//for (size_t i=0; i<bs.n; i++) Rcpp::Rcout << bs.row[i] << " " << bs.nrows[i] << "; ";
+//Rcpp::Rcout << std::endl;
+
 
 	if (!rs.readStart()) {
 		setError(getError());
@@ -191,7 +198,7 @@ std::vector<double> circ_dist(double xres, double yres, double d, size_t nrows, 
 }
 
 
-std::vector<std::vector<double>> SpatRaster::extractBuffer(const std::vector<double> &x, const std::vector<double> &y, double b) {
+std::vector<std::vector<double>> SpatRaster::extractBuffer(const std::vector<double> &x, const std::vector<double> &y, double b, SpatOptions &opt) {
 
 	std::vector<std::vector<double>> out;
 	
@@ -229,7 +236,7 @@ std::vector<std::vector<double>> SpatRaster::extractBuffer(const std::vector<dou
 	}
 	
     std::vector<double> cells = cellFromXY(x, y);
-	std::vector<std::vector<double>> v = extractCell(cells);
+	std::vector<std::vector<double>> v = extractCell(cells, opt);
 
 	std::vector<double> bestcell = cells;
 	std::vector<double> bestdist(cells.size());
@@ -243,7 +250,7 @@ std::vector<std::vector<double>> SpatRaster::extractBuffer(const std::vector<dou
 			if (std::isnan(v[0][i]) && (!std::isnan(cells[i]))) {
 				std::vector<double> acells = adjacentMat({cells[i]}, adj, dim, false);
 				permute(acells, pm);
-				std::vector<std::vector<double>> vv = extractCell(acells);
+				std::vector<std::vector<double>> vv = extractCell(acells, opt);
 	// take the first nearest. Instead could average over the cells with same distance
 				for (size_t j=0; j<vv[0].size(); j++) {
 					if (!std::isnan(vv[0][j])) {
@@ -488,19 +495,22 @@ std::vector<double> bilinearInt(const double& x, const double& y,
 }
 
 
-void SpatRaster::bilinearValues(std::vector<std::vector<double>> &out, const std::vector<double> &x, const std::vector<double> &y) {
+void SpatRaster::bilinearValues(std::vector<std::vector<double>> &out, const std::vector<double> &x, const std::vector<double> &y, SpatOptions &opt) {
 
 
 	std::vector<double> four;
 	fourCellsFromXY(four, x, y);
 	std::vector<std::vector<double>> xy = xyFromCell(four);
-	std::vector<std::vector<double>> v = extractCell(four);
+	std::vector<std::vector<double>> v = extractCell(four, opt);
 	size_t n = x.size();
 	out.resize(nlyr(), std::vector<double>(n));
 
 	for (size_t i=0; i<n; i++) {
 		size_t ii = i * 4;
 		for (size_t j=0; j<nlyr(); j++) {
+//			Rcpp::Rcout << xy[0][ii] << " " << xy[0][ii+1] << " " << xy[0][ii+2] << " " << xy[0][ii+3] << std::endl;
+//			Rcpp::Rcout << xy[1][ii] << " " << xy[1][ii+1] << " " << xy[1][ii+2] << " " << xy[1][ii+3] << std::endl;
+			
 			std::vector<double> value = bilinearInt(x[i], y[i], xy[0][ii], xy[0][ii+1], xy[1][ii], xy[1][ii+3], 
 												v[j][ii], v[j][ii+1], v[j][ii+2], v[j][ii+3], false);
 			out[j][i] = value[0];
@@ -695,7 +705,7 @@ idw
 
 
 // <layer<values>>
-std::vector<std::vector<double>> SpatRaster::extractXY(const std::vector<double> &x, const std::vector<double> &y, const std::string &method, const bool &cells) {
+std::vector<std::vector<double>> SpatRaster::extractXY(const std::vector<double> &x, const std::vector<double> &y, const std::string &method, const bool &cells, SpatOptions &opt) {
 
     unsigned nl = nlyr();
     unsigned np = x.size();
@@ -706,14 +716,14 @@ std::vector<std::vector<double>> SpatRaster::extractXY(const std::vector<double>
 	std::vector<std::vector<double>> out;
 	
     if (method == "bilinear") {
-		bilinearValues(out, x, y);
+		bilinearValues(out, x, y, opt);
 		if (cells) {
 			std::vector<double> cell = cellFromXY(x, y);
 			out.push_back(cell);
 		}
 	} else {
         std::vector<double> cell = cellFromXY(x, y);
-        out = extractCell(cell);
+        out = extractCell(cell, opt);
 		if (cells) {
 			out.push_back(cell);
 		}
@@ -723,11 +733,11 @@ std::vector<std::vector<double>> SpatRaster::extractXY(const std::vector<double>
 }
 
 
-std::vector<double> SpatRaster::extractXYFlat(const std::vector<double> &x, const std::vector<double> &y, const std::string & method, const bool &cells) {
+std::vector<double> SpatRaster::extractXYFlat(const std::vector<double> &x, const std::vector<double> &y, const std::string & method, const bool &cells, SpatOptions &opt) {
 
 
 // <layer<values>>
-	std::vector<std::vector<double>> e = extractXY(x, y, method, cells);
+	std::vector<std::vector<double>> e = extractXY(x, y, method, cells, opt);
 	std::vector<double> out = e[0];
 	for (size_t i=1; i<e.size(); i++) {
 		out.insert(out.end(), e[i].begin(), e[i].end());
@@ -820,7 +830,7 @@ std::vector<std::vector<std::vector<double>>> SpatRaster::extractVector(SpatVect
 		if (vd.nrow() == ng) {  // single point geometry
 			std::vector<double> x = vd.getD(0);
 			std::vector<double> y = vd.getD(1);
-			srcout = extractXY(x, y, method, cells);
+			srcout = extractXY(x, y, method, cells, opt);
 			for (size_t i=0; i<ng; i++) {
 				for (size_t j=0; j<nl; j++) {
 					out[i][j].push_back( srcout[j][i] );
@@ -879,7 +889,7 @@ std::vector<std::vector<std::vector<double>>> SpatRaster::extractVector(SpatVect
 			} else {
 				cell = rasterizeCells(p, touches, small, opt);
             }
-			srcout = extractCell(cell);
+			srcout = extractCell(cell, opt);
             for (size_t j=0; j<nl; j++) {
                 out[i][j] = srcout[j];
             }
@@ -1075,9 +1085,9 @@ std::vector<double> SpatRaster::extractVectorFlat(SpatVector v, std::vector<std:
 			xycells = xyFromCell(cellxy);
 		}
 		if (!cells & !xy) {
-			return( extractXYFlat(x, y, method, cells));
+			return( extractXYFlat(x, y, method, cells, opt));
 		} else {
-			std::vector<std::vector<double>> srcout = extractXY(x, y, method, cells);
+			std::vector<std::vector<double>> srcout = extractXY(x, y, method, cells, opt);
 			nl += cells;
 			flat.reserve(ng * nl);
 			for (size_t i=0; i<ng; i++) {
@@ -1172,7 +1182,7 @@ std::vector<double> SpatRaster::extractVectorFlat(SpatVector v, std::vector<std:
 		}
 		
 		if (havefun) {
-			std::vector<std::vector<double>> cvals = extractCell(cell);
+			std::vector<std::vector<double>> cvals = extractCell(cell, opt);
 			if (weights | exact) {
 				for (size_t j=0; j<funs.size(); j++) {
 					for (size_t k=0; k<nl; k++) {
@@ -1187,7 +1197,7 @@ std::vector<double> SpatRaster::extractVectorFlat(SpatVector v, std::vector<std:
 				}
 			}			
 		} else {
-			out[i] = extractCell(cell);
+			out[i] = extractCell(cell, opt);
 			if (cells) {
 				out[i].push_back(cell);
 			}
@@ -1224,7 +1234,7 @@ std::vector<double> SpatRaster::extractVectorFlat(SpatVector v, std::vector<std:
 
 
 
-std::vector<std::vector<double>> SpatRaster::extractCell(std::vector<double> &cell) {
+std::vector<std::vector<double>> SpatRaster::extractCell(std::vector<double> &cell, SpatOptions opt) {
 
 
 	std::vector<double> wcell;
@@ -1285,9 +1295,9 @@ std::vector<std::vector<double>> SpatRaster::extractCell(std::vector<double> &ce
 			size_t pos = source[src].filename.find("https://");
 			if ((pos != std::string::npos) && (rc[0].size() > 200)) {
 				if (win) {
-					readRowColBlock(src, out, lyr, wrc[0], wrc[1]);
+					readRowColBlock(src, out, lyr, wrc[0], wrc[1], opt);
 				} else {
-					readRowColBlock(src, out, lyr, rc[0], rc[1]);
+					readRowColBlock(src, out, lyr, rc[0], rc[1], opt);
 				}
 			} else {
 				if (win) {
@@ -1496,23 +1506,23 @@ std::vector<double> SpatRaster::extCells(SpatExtent ext) {
 
 
 
-std::vector<std::vector<std::vector<double>>> SpatRasterStack::extractXY(std::vector<double> &x, std::vector<double> &y, std::string method) {
+std::vector<std::vector<std::vector<double>>> SpatRasterStack::extractXY(std::vector<double> &x, std::vector<double> &y, std::string method, SpatOptions &opt) {
 	unsigned ns = nsds();
 	std::vector<std::vector<std::vector<double>>> out(ns);
 	bool cells = false;
 	for (size_t i=0; i<ns; i++) {
 		SpatRaster r = getsds(i);
-		out[i] = r.extractXY(x, y, method, cells);
+		out[i] = r.extractXY(x, y, method, cells, opt);
 	}
 	return out;
 }
 
-std::vector<std::vector<std::vector<double>>> SpatRasterStack::extractCell(std::vector<double> &cell) {
+std::vector<std::vector<std::vector<double>>> SpatRasterStack::extractCell(std::vector<double> &cell, SpatOptions &opt) {
 	unsigned ns = nsds();
 	std::vector<std::vector<std::vector<double>>> out(ns);
 	for (size_t i=0; i<ns; i++) {
 		SpatRaster r = getsds(i);
-		out[i] = r.extractCell(cell);
+		out[i] = r.extractCell(cell, opt);
 	}
 	return out;
 }

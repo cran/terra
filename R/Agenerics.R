@@ -64,6 +64,7 @@ if (!isGeneric("scoff<-")) {setGeneric("scoff<-", function(x, ..., value) standa
 
 if (!isGeneric("blocks")) {setGeneric("blocks", function(x, ...) standardGeneric("blocks"))}
 if (!isGeneric("droplevels")) {setGeneric("droplevels", function(x, ...) standardGeneric("droplevels"))}
+if (!isGeneric("simplifyLevels")) {setGeneric("simplifyLevels", function(x, ...) standardGeneric("simplifyLevels"))}
 
 if (!isGeneric("str")) { setGeneric("str", function(object, ...) standardGeneric("str"))}
 
@@ -157,6 +158,7 @@ if (!isGeneric("gaps")) {setGeneric("gaps", function(x, ...) standardGeneric("ga
 if (!isGeneric("is.rotated")) {setGeneric("is.rotated", function(x, ...) standardGeneric("is.rotated"))}
 if (!isGeneric("is.flipped")) {setGeneric("is.flipped", function(x, ...) standardGeneric("is.flipped"))}
 
+if (!isGeneric("is.num")) {setGeneric("is.num", function(x) standardGeneric("is.num"))}
 if (!isGeneric("is.int")) {setGeneric("is.int", function(x) standardGeneric("is.int"))}
 if (!isGeneric("as.int")) {setGeneric("as.int", function(x, ...) standardGeneric("as.int"))}
 if (!isGeneric("is.bool")) {setGeneric("is.bool", function(x) standardGeneric("is.bool"))}
@@ -198,6 +200,10 @@ if (!isGeneric("crosstab")) { setGeneric("crosstab", function(x, y, ...) standar
 if (!isGeneric("describe")) { setGeneric("describe", function(x, ...) standardGeneric("describe"))}
 if (!isGeneric("depth")) {setGeneric("depth", function(x,...) standardGeneric("depth"))}
 if (!isGeneric("depth<-")) {setGeneric("depth<-", function(x, value) standardGeneric("depth<-"))}
+if (!isGeneric("depthName")) {setGeneric("depthName", function(x,...) standardGeneric("depthName"))}
+if (!isGeneric("depthName<-")) {setGeneric("depthName<-", function(x, value) standardGeneric("depthName<-"))}
+if (!isGeneric("depthUnit")) {setGeneric("depthUnit", function(x,...) standardGeneric("depthUnit"))}
+if (!isGeneric("depthUnit<-")) {setGeneric("depthUnit<-", function(x, value) standardGeneric("depthUnit<-"))}
 if (!isGeneric("draw")) {setGeneric("draw", function(x,...) standardGeneric("draw"))}
 if (!isGeneric("ext")) { setGeneric("ext", function(x, ...)	standardGeneric("ext"))}
 if (!isGeneric("ext<-")) { setGeneric("ext<-", function(x, value) standardGeneric("ext<-")) }

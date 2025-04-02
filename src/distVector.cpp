@@ -27,6 +27,12 @@
 
 #include "Rcpp.h"
 
+#if defined(HAVE_TBB) && !defined(__APPLE__)
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+#endif 
+
+
 double polDistLonLat(SpatVector &p1, SpatVector &p2, std::string unit, std::string method) {
 
 	std::vector<int> inside = p1.relate(p2, "intersects", true, true);
@@ -396,7 +402,7 @@ std::vector<double> SpatVector::nearestDistLonLat(std::vector<double> x, std::ve
 }
 */
 
-std::vector<double> SpatVector::distance(SpatVector x, bool pairwise, std::string unit, const std::string method) {
+std::vector<double> SpatVector::distance(SpatVector x, bool pairwise, std::string unit, const std::string method, bool use_nodes, SpatOptions &opt) {
 
 	std::vector<double> d;
 
@@ -408,30 +414,63 @@ std::vector<double> SpatVector::distance(SpatVector x, bool pairwise, std::strin
 		setError("crs do not match");
 		return(d);
 	}
-
+	
 	size_t s = size();
 	size_t sx = x.size();
 	if ((s == 0) || (sx == 0)) {
 		setError("empty SpatVector");
 		return(d);
 	}
-
-	if (pairwise && (s != sx ) && (s > 1) && (sx > 1))  {
-		setError("For pairwise distance, the number of geometries must match, or one should have a single geometry");
-		return(d);
-	}
-
 	bool lonlat = is_lonlat();
 	double m=1;
 	if (!srs.m_dist(m, lonlat, unit)) {
 		setError("invalid unit");
 		return(d);
 	}
-
-	if ((method != "geo") && (method != "cosine")) {
-		setError("invalid method. Must be 'geo' or 'cosine'");
+	if (pairwise && (s != sx ) && (s > 1) && (sx > 1))  {
+		setError("For pairwise distance, the number of geometries must match, or one should have a single geometry");
 		return(d);
 	}
+
+
+	if ((method != "geo") && (method != "cosine") && (method != "haversine")) {
+		setError("invalid method. Must be 'geo', 'haversine' or 'cosine'");
+		return(d);
+	}
+
+	if (lonlat && use_nodes) {
+		SpatVector p = as_points(true, false);
+		SpatVector xp = x.as_points(true, false);
+		std::vector<double> out;
+		if (pairwise) {
+			out.reserve(p.size());
+			for (size_t i=0; i<p.size(); i++) {
+				SpatVector pi = p.subset_rows(i);	
+				SpatVector xpi = xp.subset_rows(i);	
+				std::vector<std::vector<double>> pc = pi.coordinates();
+				std::vector<std::vector<double>> xpc = xpi.coordinates();
+				std::vector<double> d = pointdistance(pc[0], pc[1], xpc[0], xpc[1], false, m, lonlat, method);
+				auto min_it = std::min_element(d.begin(), d.end());
+				out.push_back(*min_it);
+			}			
+		} else {
+			out.reserve(p.size() * xp.size());
+			for (size_t i=0; i<p.size(); i++) {
+				SpatVector pi = p.subset_rows(i);	
+				std::vector<std::vector<double>> pc = pi.coordinates();
+				for (size_t j=0; j<xp.size(); j++) {
+					SpatVector xpj = xp.subset_rows(j);	
+					std::vector<std::vector<double>> xpc = xpj.coordinates();
+					std::vector<double> d = pointdistance(pc[0], pc[1], xpc[0], xpc[1], false, m, lonlat, method);
+					auto min_it = std::min_element(d.begin(), d.end());
+					out.push_back(*min_it);
+				}
+			}
+		}
+		return out;
+	}
+
+
 
 	std::string gtype = type();
 	std::string xtype = x.type();
@@ -442,19 +481,58 @@ std::vector<double> SpatVector::distance(SpatVector x, bool pairwise, std::strin
 		return pointdistance(p[0], p[1], px[0], px[1], pairwise, m, lonlat, method);
 	} else if ((gtype == "points") || (xtype == "points")) {
 		if (lonlat) {
-			// not ok for multi-points
+			// not yet ok for multi-points
 			if (gtype == "points") {
 //				std::vector<std::vector<double>> xy = coordinates();
-				return x.distLonLat(*this, unit, method, false);	
+				if (pairwise) {
+					std::vector<double> out;
+					out.reserve(size());
+					for (size_t i=0; i<size(); i++) {
+						SpatVector p = subset_rows(i);	
+						SpatVector xp = x.subset_rows(i);	
+						std::vector<double> d = xp.distLonLat(p, unit, method, false);	
+						auto min_it = std::min_element(d.begin(), d.end());
+						out.push_back(*min_it);
+					} 
+					return out;					
+				} else {
+					return x.distLonLat(*this, unit, method, false);	
+				}
 			} else {
 //				std::vector<std::vector<double>> xy = x.coordinates();
-				return distLonLat(x, unit, method, true);					
+				if (pairwise) {
+					std::vector<double> out;
+					out.reserve(size());
+					for (size_t i=0; i<size(); i++) {
+						SpatVector p = subset_rows(i);	
+						SpatVector xp = x.subset_rows(i);	
+						std::vector<double> d = p.distLonLat(xp, unit, method, false);	
+						auto min_it = std::min_element(d.begin(), d.end());
+						out.push_back(*min_it);
+					} 
+					return out;					
+				} else {
+					return distLonLat(x, unit, method, true);					
+				}
 			}
 		} else {
 			return geos_distance(x, pairwise, "", m);
 		}
 	} else {
 		if (lonlat) {
+
+			if (pairwise) {
+				d.reserve(size());
+				for (size_t i=0; i<size(); i++) {
+					SpatVector p = subset_rows(i);	
+					SpatVector xp = x.subset_rows(i);	
+					double d1 = polDistLonLat(p, xp, unit, method);	
+					double d2 = polDistLonLat(xp, p, unit, method);
+					d.push_back(std::min(d1, d2));
+				} 
+				return d;
+			}
+
 			size_t n = size() * x.size();
 			d.reserve(n);
 
@@ -499,7 +577,7 @@ std::vector<double> SpatVector::distance(SpatVector x, bool pairwise, std::strin
 
 
 // distance to self
-std::vector<double> SpatVector::distance(bool sequential, std::string unit, const std::string method) {
+std::vector<double> SpatVector::distance(bool sequential, std::string unit, const std::string method, bool use_nodes, SpatOptions &opt) {
 
 	std::vector<double> d;
 	if (srs.is_empty()) {
@@ -513,6 +591,39 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 		setError("invalid unit");
 		return(d);
 	}
+
+	if (lonlat && use_nodes) {
+		SpatVector p = as_points(true, false);
+		std::vector<double> out;
+		if (sequential) {
+			out.reserve(p.size()-1);
+			SpatVector pi = p.subset_rows(0);	
+			std::vector<std::vector<double>> pic = pi.coordinates();
+			for (size_t i=0; i<(p.size()-1); i++) {
+				SpatVector pj = p.subset_rows(i+1);	
+				std::vector<std::vector<double>> pjc = pj.coordinates();
+				std::vector<double> d = pointdistance(pic[0], pic[1], pjc[0], pjc[1], false, m, lonlat, method);
+				auto min_it = std::min_element(d.begin(), d.end());
+				out.push_back(*min_it);
+				pic = pjc;
+			}
+		} else {
+			out.reserve((p.size() * (p.size()-1)) / 2);
+			for (size_t i=0; i<(p.size()-1); i++) {
+				SpatVector pi = p.subset_rows(i);	
+				std::vector<std::vector<double>> pic = pi.coordinates();
+				for (size_t j=(i+1); j<p.size(); j++) {
+					SpatVector pj = p.subset_rows(j);	
+					std::vector<std::vector<double>> pjc = pj.coordinates();
+					std::vector<double> d = pointdistance(pic[0], pic[1], pjc[0], pjc[1], false, m, lonlat, method);
+					auto min_it = std::min_element(d.begin(), d.end());
+					out.push_back(*min_it);
+				}
+			}
+		}
+		return out;
+	}
+	
 	std::string gtype = type();
 	std::function<double(double, double, double, double)> dfun;
 	if (gtype == "points") {
@@ -531,20 +642,35 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 		if (sequential) {
 			std::vector<std::vector<double>> p = coordinates();
 			size_t n = p[0].size();
-			d.reserve(n);
-			d.push_back(0);
-			n -= 1;
 			if (lonlat) {
-				for (size_t i=0; i<n; i++) {
-					d.push_back(
-						dfun(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) *  m
-					);
+#if defined(HAVE_TBB) && !defined(__APPLE__)
+				if (opt.parallel) {
+					d.resize(n);
+					tbb::parallel_for(tbb::blocked_range<size_t>(0, n-1),
+					[&](const tbb::blocked_range<size_t>& range) {
+						for (size_t i = range.begin(); i != range.end(); i++) {
+							d[i+1] = dfun(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) * m;
+						}
+					});
+				} else {
+					d.reserve(n);
+					d.push_back(0);
+					n -= 1;
+					for (size_t i=0; i<n; i++) {
+						d.push_back( dfun(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) *  m );
+					}
 				}
+#else
+				d.reserve(n);
+				d.push_back(0);
+				n -= 1;
+				for (size_t i=0; i<n; i++) {
+					d.push_back( dfun(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) *  m );
+				}
+#endif
 			} else {
 				for (size_t i=0; i<n; i++) {
-					d.push_back(
-						distance_plane(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) * m
-					);
+					d.push_back( distance_plane(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) * m );
 				}
 			}
 		} else {
@@ -553,13 +679,35 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 			d.reserve(n);
 			std::vector<std::vector<double>> p = coordinates();
 			if (lonlat) {			
-				for (size_t i=0; i<(s-1); i++) {
-					for (size_t j=(i+1); j<s; j++) {
-						d.push_back(
-							dfun(p[0][i], p[1][i], p[0][j], p[1][j]) * m
-						);
+#if defined(HAVE_TBB) && !defined(__APPLE__)
+				if (opt.parallel) {
+					d.resize(n);
+					tbb::parallel_for(tbb::blocked_range<size_t>(0, s-1),
+					[&](const tbb::blocked_range<size_t>& range) {
+						for (size_t i = range.begin(); i != range.end(); i++) {
+							size_t k = 0;
+							for (size_t j=0; j<i; j++) {
+								k += s-1-j;
+							}
+							for (size_t j=(i+1); j<s; j++) {
+								d[k+j-i-1] = dfun(p[0][i], p[1][i], p[0][j], p[1][j]) * m;
+							}
+						}
+					});
+				} else {
+					for (size_t i=0; i<(s-1); i++) {
+						for (size_t j=(i+1); j<s; j++) {
+							d.push_back(dfun(p[0][i], p[1][i], p[0][j], p[1][j]) * m);
+						}
 					}
 				}
+#else
+				for (size_t i=0; i<(s-1); i++) {
+					for (size_t j=(i+1); j<s; j++) {
+						d.push_back( dfun(p[0][i], p[1][i], p[0][j], p[1][j]) * m );
+					}
+				}
+#endif
 			} else {
 				for (size_t i=0; i<(s-1); i++) {
 					for (size_t j=(i+1); j<s; j++) {
@@ -574,6 +722,8 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 		if (lonlat) {
 			if (method == "cosine") {
 				dfun = distCosine;			
+			} else if (method == "haversine") {
+				dfun = distHaversine;
 			} else if (method == "geo") {
 				dfun = distLonlat;
 			} else {
@@ -586,57 +736,80 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 
 			if (sequential) {
 
-				std::vector<std::vector<size_t>> idx;
-
 				n -= 1;
-				SpatVector tmp1 = subset_rows(0);
-//				std::vector<std::vector<double>> xy1 = tmp1.coordinates();
-				for (size_t i=0; i<n; i++) {
-					SpatVector tmp2 = subset_rows( (long)i+1 );
-//					std::vector<std::vector<double>> xy2 = tmp2.coordinates();
-//					std::vector<double> d1 = tmp2.distLonLat(xy1[0], xy1[1], unit, method, false);
-//					std::vector<double> d2 = tmp1.distLonLat(xy2[0], xy2[1], unit, method, false);
-//					std::vector<double> d1 = tmp2.distLonLat(tmp1, unit, method, false);
-//					std::vector<double> d2 = tmp1.distLonLat(tmp2, unit, method, false);
-//					d.push_back(std::min(vmin(d1, false), vmin(d2, false)));
-
-					double d1 = polDistLonLat(tmp2, tmp1, unit, method);
-					double d2 = polDistLonLat(tmp1, tmp2, unit, method);
-					d.push_back(std::min(d1, d2));
-
-					tmp1 = tmp2;
-//					xy1 = xy2;
-				}
-			} else {
-				size_t s = size();
-				size_t n = ((s-1) * s)/2;
-				d.reserve(n);
-
-/*
-				std::vector<std::vector<double>> ee, empty;
-				ee.reserve(n);
-				for (size_t g=0; g<n; g++) {
-					ee.push_back(geoms[g].extent.asVector());
-				}
-				std::vector<std::vector<size_t>> idx = get_index(ee, empty);
-*/
-
-				for (size_t i=0; i<(s-1); i++) {
-					SpatVector tmp1 = subset_rows(long(i));
-//					std::vector<std::vector<double>> xy1 = tmp1.coordinates();
-					for (size_t j=(i+1); j<s; j++) {
-						SpatVector tmp2 = subset_rows( long(j) );
-//						std::vector<std::vector<double>> xy2 = tmp2.coordinates();
-//						std::vector<double> d1 = tmp2.distLonLat(xy1[0], xy1[1], unit, method, false);
-//						std::vector<double> d2 = tmp1.distLonLat(xy2[0], xy2[1], unit, method, false);
-//						std::vector<double> d1 = tmp2.distLonLat(tmp1, unit, method, false);
-//						std::vector<double> d2 = tmp1.distLonLat(tmp2, unit, method, false);
-//						d.push_back(std::min(vmin(d1, false), vmin(d2, false)));
-
+//				std::vector<std::vector<size_t>> idx;
+#if defined(HAVE_TBB) && !defined(__APPLE__)
+				if (opt.parallel) {
+					d.resize(n);			
+					tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
+					[&](const tbb::blocked_range<size_t>& range) {
+						for (size_t i = range.begin(); i != range.end(); i++) {
+							SpatVector tmp1 = subset_rows((long)i);
+							SpatVector tmp2 = subset_rows((long)i+1);
+							double d1 = polDistLonLat(tmp2, tmp1, unit, method);
+							double d2 = polDistLonLat(tmp1, tmp2, unit, method);
+							d[i] = std::min(d1, d2);
+						}
+					});
+				} else {
+					SpatVector tmp1 = subset_rows(0);
+					for (size_t i=0; i<n; i++) {
+						SpatVector tmp2 = subset_rows( (long)i+1 );
 						double d1 = polDistLonLat(tmp2, tmp1, unit, method);
 						double d2 = polDistLonLat(tmp1, tmp2, unit, method);
 						d.push_back(std::min(d1, d2));
+						tmp1 = tmp2;
 					}
+				}
+#else
+				SpatVector tmp1 = subset_rows(0);
+				for (size_t i=0; i<n; i++) {
+					SpatVector tmp2 = subset_rows( (long)i+1 );
+					double d1 = polDistLonLat(tmp2, tmp1, unit, method);
+					double d2 = polDistLonLat(tmp1, tmp2, unit, method);
+					d.push_back(std::min(d1, d2));
+					tmp1 = tmp2;
+				}
+#endif				
+			} else {  // not sequential
+				size_t s = size();
+				size_t n = ((s-1) * s)/2;
+				d.reserve(n);
+								
+				std::vector<double> dst;
+				for (size_t i=0; i<(s-1); i++) {
+					SpatVector tmp1 = subset_rows(long(i));
+					dst.resize(s-i-1);
+
+#if defined(HAVE_TBB) && !defined(__APPLE__)
+					if (opt.parallel) {
+						tbb::parallel_for(tbb::blocked_range<size_t>((i+1), s),
+						[&](const tbb::blocked_range<size_t>& range) {
+							for (size_t j = range.begin(); j != range.end(); j++) {
+								SpatVector tmp2 = subset_rows( long(j) );
+								double d1 = polDistLonLat(tmp2, tmp1, unit, method);
+								double d2 = polDistLonLat(tmp1, tmp2, unit, method);
+								dst[j-i-1] = std::min(d1, d2);
+							}
+						});
+					} else {
+						for (size_t j=(i+1); j<s; j++) {
+							SpatVector tmp2 = subset_rows( long(j) );
+							double d1 = polDistLonLat(tmp2, tmp1, unit, method);
+							double d2 = polDistLonLat(tmp1, tmp2, unit, method);
+							dst[j-i-1] = std::min(d1, d2);
+						}						
+					}
+#else
+					for (size_t j=(i+1); j<s; j++) {
+						SpatVector tmp2 = subset_rows( long(j) );
+						double d1 = polDistLonLat(tmp2, tmp1, unit, method);
+						double d2 = polDistLonLat(tmp1, tmp2, unit, method);
+						dst[j-i-1] = std::min(d1, d2);
+					}
+#endif
+					d.insert(d.end(), dst.begin(), dst.end());
+
 				}
 			}
 		} else {
@@ -1133,7 +1306,7 @@ SpatGeom hullify(SpatVector b, bool ispoly) {
 	SpatVector part;
 	part.reserve(b.size());
 	for (size_t j =0; j<(b.size()-1); j++) {
-		std::vector<unsigned> range = {(unsigned)j, (unsigned)j+1};
+		std::vector<size_t> range = {j, j+1};
 		SpatVector g = b.subset_rows(range);
 		g = g.hull("convex");
 		part.addGeom(g.geoms[0]);
@@ -1217,7 +1390,7 @@ SpatVector lonlat_buf(SpatVector x, double dist, unsigned quadsegs, bool ispol, 
 SpatVector SpatVector::buffer_lonlat(std::string vt, std::vector<double> d, unsigned quadsegs) {
 
 	SpatVector out;
-	std::vector<unsigned> keep;
+	std::vector<size_t> keep;
 	keep.reserve(size());
 	if (vt == "points") {
 		return point_buffer(d, quadsegs, false, true);
@@ -1513,7 +1686,7 @@ std::vector<double> SpatVector::length() {
 
 
 double edges_geom(const SpatGeom &geom) {
-	double edges = 0;
+	size_t edges = 0;
 	if (geom.gtype == points) return edges;
 	for (size_t i=0; i<geom.parts.size(); i++) {
 		edges += geom.parts[i].y.size();
@@ -1524,10 +1697,10 @@ double edges_geom(const SpatGeom &geom) {
 	return edges-1;
 }
 
-std::vector<double> SpatVector::nseg() {
+std::vector<size_t> SpatVector::nseg() {
 
 	size_t s = size();
-	std::vector<double> r;
+	std::vector<size_t> r;
 	r.reserve(s);
 	for (size_t i=0; i<s; i++) {
 		r.push_back(edges_geom(geoms[i]));
