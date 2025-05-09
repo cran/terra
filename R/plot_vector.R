@@ -441,10 +441,12 @@ setMethod("dots", signature(x="SpatVector"),
     sub = "", font.sub=1, cex.sub=0.8*cex.main, line.sub =1.75,  col.sub=col.main, loc.sub=NULL,
 	halo=FALSE, hc="white", hw=0.1, 
 	density=NULL, angle=45, border="black", dig.lab=3, cex=1, clip=TRUE, leg_i=1, asp=NULL, xpd=NULL, 
-	decreasing = FALSE, ...) {
+#catch and kill
+	decreasing=FALSE, font=NULL,
+	...) {
 
 	# backwards compatibility
-	reverse <- reverse | decreasing
+	reverse <- isTRUE(reverse) || isTRUE(decreasing)
 
 	out <- list()
 	out$blank <- FALSE
@@ -665,7 +667,6 @@ setMethod("dots", signature(x="SpatVector"),
 #		}
 #	}
 #	out$mar <- rep_len(mar, 4)
-
 	out$skipNA <- TRUE
 	if (!is.null(colNA)) {
 		if (!is.na(colNA)) {
@@ -682,10 +683,10 @@ setMethod("dots", signature(x="SpatVector"),
 
 
 setMethod("plot", signature(x="SpatVector", y="character"),
-	function(x, y, col=NULL, type=NULL, mar=NULL, add=FALSE, legend=TRUE, axes=!add,
-	main, buffer=TRUE, background=NULL, grid=FALSE, ext=NULL, 
-	sort=TRUE, reverse=FALSE, fun=NULL, plg=list(), pax=list(), nr, nc, colNA=NA, 
-	alpha=NULL, box=axes, clip=TRUE, ...) {
+	function(x, y, col=NULL, type=NULL, mar=NULL, legend=TRUE, axes=!add, plg=list(), pax=list(), 
+    main="", grid=FALSE, ext=NULL, sort=TRUE, reverse=FALSE, fun=NULL,
+	colNA=NA, alpha=NULL, nr, nc, add=FALSE, buffer=TRUE, background=NULL, 
+	box=axes, clip=TRUE, ...) {
 
 		old.mar <- graphics::par()$mar
 		on.exit(graphics::par(mar=old.mar))

@@ -27,7 +27,7 @@
 
 #include "Rcpp.h"
 
-#if defined(HAVE_TBB) && !defined(__APPLE__)
+#if defined(USE_TBB)
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 #endif 
@@ -643,7 +643,7 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 			std::vector<std::vector<double>> p = coordinates();
 			size_t n = p[0].size();
 			if (lonlat) {
-#if defined(HAVE_TBB) && !defined(__APPLE__)
+#if defined(USE_TBB)
 				if (opt.parallel) {
 					d.resize(n);
 					tbb::parallel_for(tbb::blocked_range<size_t>(0, n-1),
@@ -669,6 +669,9 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 				}
 #endif
 			} else {
+				d.reserve(n);
+				d.push_back(0);
+				n -= 1;
 				for (size_t i=0; i<n; i++) {
 					d.push_back( distance_plane(p[0][i], p[1][i], p[0][i+1], p[1][i+1]) * m );
 				}
@@ -679,10 +682,10 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 			d.reserve(n);
 			std::vector<std::vector<double>> p = coordinates();
 			if (lonlat) {			
-#if defined(HAVE_TBB) && !defined(__APPLE__)
+#if defined(USE_TBB)
 				if (opt.parallel) {
 					d.resize(n);
-					tbb::parallel_for(tbb::blocked_range<size_t>(0, s-1),
+					tbb::parallel_for(tbb::blocked_range<size_t>(0, s-2),
 					[&](const tbb::blocked_range<size_t>& range) {
 						for (size_t i = range.begin(); i != range.end(); i++) {
 							size_t k = 0;
@@ -738,7 +741,7 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 
 				n -= 1;
 //				std::vector<std::vector<size_t>> idx;
-#if defined(HAVE_TBB) && !defined(__APPLE__)
+#if defined(USE_TBB)
 				if (opt.parallel) {
 					d.resize(n);			
 					tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
@@ -781,7 +784,7 @@ std::vector<double> SpatVector::distance(bool sequential, std::string unit, cons
 					SpatVector tmp1 = subset_rows(long(i));
 					dst.resize(s-i-1);
 
-#if defined(HAVE_TBB) && !defined(__APPLE__)
+#if defined(USE_TBB)
 					if (opt.parallel) {
 						tbb::parallel_for(tbb::blocked_range<size_t>((i+1), s),
 						[&](const tbb::blocked_range<size_t>& range) {

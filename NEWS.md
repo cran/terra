@@ -1,4 +1,31 @@
+# version 1.8-50
+
+## bug fixes
+- `rast(xyz=TRUE)` failed if there was no z variable [#1802](https://github.com/rspatial/terra/issues/1802) by Martin Jung
+- `metags` failed if a matrix was used [#1803](https://github.com/rspatial/terra/issues/1803) by fchianucci
+- `distance<SpatVector>(sequential=TRUE)` did not return a vector with the first value of zero (and there was an additional value [#1804](https://github.com/rspatial/terra/issues/1804) by Edward Lavender
+- `depth` information was dropped even when there was no reason for that [#1806](https://github.com/rspatial/terra/issues/1806) by Daniel R Schlaepfer
+- `plet` did not work for logical SpatRasters [#1820](https://github.com/rspatial/terra/issues/1820) by Andrew Gene Brown
+- `extract<SpatRaster>` with a "window" set, did not work properly [#1819](https://github.com/rspatial/terra/issues/1819) by Derek Friend
+- `extract<SpatRaster>` with argument "layers" and xy=TRUE added an unexpected additional column [#1818](https://github.com/rspatial/terra/issues/1818) by Breeze-Hu
+- `extractRange` now honors arguments `bind` and assigns `ID` within a list [#1816](https://github.com/rspatial/terra/issues/1816) by WillhKessler
+- `crop<SpatRaster,SpatVector>(mask=TRUE)` did not crop if the SpatVector was (partly) outside the SpatVector [#1824](https://github.com/rspatial/terra/issues/1824) by Márcia Barbosa
+
+
+## enhancements
+- `init` with a matrix argument now keeps the same row/col values [#1801](https://github.com/rspatial/terra/issues/1801) Jakub Nowosad
+- `rasterize` now checks for very large numbers and switches to FLT8S if detected. [#1797](https://github.com/rspatial/terra/issues/1797) by Evan Muise
+- `rast`, `sds` and `sprc` get new argument "guessCRS" to suppress CRS guessing [#1800](https://github.com/rspatial/terra/issues/1800) by Aseem Sharma
+- `plot<SpatRaster/SpatVector>` with a continuous legend now responds to `plg=list(horiz=TRUE))` [#1805](https://github.com/rspatial/terra/issues/1805) by Nathanael Walker-Hale
+
+## new
+
+- `spatSample(method="spread")` to get an approximate regular sample of the cells that are not `NA` 
+
+
 # version 1.8-42
+
+Released 2025-04-02
 
 ## bug fixes
 
@@ -24,14 +51,14 @@
 - `spatSample<SpatRaster>(method="stratified")` now also finds cells for very small strata in big rasters (suggested by Andrea Duane). 
 - `plot<SpatVector>` now also has argument "fun" [#1786](https://github.com/rspatial/terra/issues/1786) by Márcia Barbosa
 - `plot<SpatRaster/Vector>` now also has argument "sub" to set a subtitle [#1790](https://github.com/rspatial/terra/issues/1790) by Agustin Lobo
-- `distance<SpatVector,SpatVector> now has argument "use_nodes" to speed things up for lon/lat data [#1722](https://github.com/rspatial/terra/issues/1722) by Márcia Barbosa
+- `distance<SpatVector,SpatVector>` now has argument "use_nodes" to speed things up for lon/lat data [#1722](https://github.com/rspatial/terra/issues/1722) by Márcia Barbosa
 
 ## new
 
 - `writeRaster` and other methods that can write raster data can now set metadata.
 - `split<SpatVector,SpatVector>` method for lines [#1374](https://github.com/rspatial/terra/issues/1374) by MTueting
 - `depthName`, `depthName<-`, `depthUnit`, and `depthUnit<-` methods
-- `is.num<SpatRaster>` [SO 795026641]	(https://stackoverflow.com/questions/79502664/what-is-the-correct-terra-usage-to-achieve-is-numeric-on-an-r-terra-package-rast) by Jacob Strunk
+- `is.num<SpatRaster>` [SO 795026641](https://stackoverflow.com/questions/79502664/what-is-the-correct-terra-usage-to-achieve-is-numeric-on-an-r-terra-package-rast) by Jacob Strunk
 - `simplifyLevels` to combine duplicate categories. [#1769](https://github.com/rspatial/terra/issues/1769) by Erik Ertsgaard
 
 
@@ -48,7 +75,7 @@ Released 2025-02-26
 
 ## enhancements
 
-- `spatSample<SpatRaster>` and `spatSample<SpatExtent>` gain argument "exact=FALSE" to request the exact (but perhaps less regular) sample size for a regular sample. Currently pnly for planar crs.
+- `spatSample<SpatRaster>` and `spatSample<SpatExtent>` gain argument "exact=FALSE" to request the exact (but perhaps less regular) sample size for a regular sample. Currently only for planar crs.
 - `spatSample<SpatRaster>` gains argument "each=TRUE" to request, when using stratified sampling, a sample size for each stratum, or for all strata combined.
 - `focal` now maintains categories with "fun=modal", "min", "max", or "first" [SO 79449904](https://stackoverflow.com/questions/79449904/preserving-original-categories-when-using-terrafocal) by Sophie Père
 

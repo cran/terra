@@ -279,7 +279,7 @@ std::vector<std::vector<std::string>> sdinfo(std::string fname) {
 			name.push_back(s);
 			std::string vdelim = ":";
 			size_t pos = s.find_last_of(vdelim);
-			if (sub.constructFromFile(s, {-1}, {""}, {}, {}, false, {})) {
+			if (sub.constructFromFile(s, {-1}, {""}, {}, {}, false, false, {})) {
 				nr.push_back(std::to_string(sub.nrow()));
 				nc.push_back(std::to_string(sub.ncol()));
 				nl.push_back(std::to_string(sub.nlyr()));
@@ -903,6 +903,15 @@ bool SpatRaster::create_gdalDS(GDALDatasetH &hDS, std::string filename, std::str
 			naflag = 255; // ?;
 		} else if (datatype == "INT1S") {
 			naflag = -128; 
+#if GDAL_VERSION_MAJOR <= 3 && GDAL_VERSION_MINOR < 5
+// no Int64
+#else 
+		} else if (datatype == "INT8S") {
+			//INT64_MIN == -9223372036854775808;
+			naflag = INT64_MIN;
+		} else if (datatype == "INT8U") {
+			naflag = UINT64_MAX-1101;
+#endif
 		}
 	} else {
 		getGDALDataType(opt.get_datatype(), gdt);

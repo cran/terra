@@ -3,6 +3,7 @@
 # Version 1.0
 # License GPL v3
 
+
 new_rast <- function(nrows=10, ncols=10, nlyrs=1, xmin=0, xmax=1, ymin=0, ymax=1, crs, extent, resolution, vals, names, time, units) {
 
 	ncols <- round(ncols)
@@ -238,7 +239,7 @@ clean_domains <- function(domains) {
 }
 
 setMethod("rast", signature(x="character"),
-	function(x, subds=0, lyrs=NULL, drivers=NULL, opts=NULL, win=NULL, snap="near", vsi=FALSE, raw=FALSE, noflip=FALSE, domains="") {
+	function(x, subds=0, lyrs=NULL, drivers=NULL, opts=NULL, win=NULL, snap="near", vsi=FALSE, raw=FALSE, noflip=FALSE, guessCRS=TRUE, domains="") {
 
 		f <- .fullFilename(x, vsi=vsi)
 		if (length(f) == 0) {
@@ -261,10 +262,9 @@ setMethod("rast", signature(x="character"),
 		if (is.null(drivers)) drivers <- ""[0]
 		if (length(subds) == 0) subds = 0
 		if (is.character(subds)) {
-			#r@pntr <- SpatRaster$new(f, -1, subds, FALSE, 0[])
-			r@pntr <- SpatRaster$new(f, -1, subds, FALSE, drivers, opts, 0[], noflip, domains)
+			r@pntr <- SpatRaster$new(f, -1, subds, FALSE, drivers, opts, 0[], isTRUE(noflip), isTRUE(guessCRS), domains)
 		} else {
-			r@pntr <- SpatRaster$new(f, subds-1, "", FALSE, drivers, opts, 0[], noflip, domains)
+			r@pntr <- SpatRaster$new(f, subds-1, "", FALSE, drivers, opts, 0[], isTRUE(noflip), isTRUE(guessCRS), domains)
 		}
 		r <- messages(r, "rast")
 		if (r@pntr$getMessage() == "ncdf extent") {
@@ -275,13 +275,6 @@ setMethod("rast", signature(x="character"),
 			}
 		}
 		r <- messages(r, "rast")
-		if (crs(r) == "") {
-			if (is.lonlat(r, perhaps=TRUE, warn=FALSE)) {
-				if (!isTRUE(all(as.vector(ext(r)) == c(0,ncol(r),0,nrow(r))))) {
-					crs(r) <- "OGC:CRS84"
-				}
-			}
-		}
 
 		if (!is.null(lyrs)) {
 			r <- r[[lyrs]]
@@ -296,7 +289,7 @@ setMethod("rast", signature(x="character"),
 )
 
 
-multi <- function(x, subds=0, xyz=3:1, drivers=NULL, opts=NULL) {
+multi <- function(x, subds=0, xyz=3:1, guessCRS=TRUE, drivers=NULL, opts=NULL) {
 
 	noflip <- FALSE
 
@@ -313,9 +306,9 @@ multi <- function(x, subds=0, xyz=3:1, drivers=NULL, opts=NULL) {
 	subds <- subds[1]
 
 	if (is.character(subds)) {
-		r@pntr <- SpatRaster$new(f, -1, subds, TRUE, drivers, opts, xyz-1, isTRUE(noflip[1]))
+		r@pntr <- SpatRaster$new(f, -1, subds, TRUE, drivers, opts, xyz-1, isTRUE(noflip), isTRUE(guessCRS))
 	} else {
-		r@pntr <- SpatRaster$new(f, subds-1, ""[0], TRUE, drivers, opts, xyz-1, isTRUE(noflip[1]))
+		r@pntr <- SpatRaster$new(f, subds-1, ""[0], TRUE, drivers, opts, xyz-1, isTRUE(noflip), isTRUE(guessCRS))
 	}
 	if (r@pntr$getMessage() == "ncdf extent") {
 		test <- try(r <- .ncdf_extent(r), silent=TRUE)
@@ -477,7 +470,7 @@ setMethod("rast", signature(x="ANY"),
 	maxy <- max(y) + 0.5 * ry
 
 	d <- dim(xyz)
-	r <- rast(xmin=minx, xmax=maxx, ymin=miny, ymax=maxy, crs=crs, nlyrs=d[2]-2)
+	r <- rast(xmin=minx, xmax=maxx, ymin=miny, ymax=maxy, crs=crs, nlyrs=max(1, d[2]-2))
 	res(r) <- c(rx, ry)
 	ext(r) <- round(ext(r), digits+2)
 	cells <- cellFromXY(r, xyz[,1:2])

@@ -2956,12 +2956,25 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 
 	SpatRaster out = geometry(1);
 
-	std::vector<std::string> f {"row", "col", "cell", "x", "y", "chess"};
+	std::vector<std::string> f {"row", "col", "cell", "x", "y", "xy", "chess"};
 	bool test = std::find(f.begin(), f.end(), value) == f.end();
 	if (test) {
 		out.setError("not a valid init option");
 		return out;
 	}
+	
+	if (value == "xy") {
+		SpatOptions ops(opt);
+		SpatRaster x = init("x", false, ops);
+		SpatRaster y = init("y", false, ops);
+		x.source.push_back(y.source[0]);
+		if (opt.get_filename() != "") {
+			x = x.writeRaster(opt);
+		}
+		return x;
+	}
+	
+	out.source[0].names[0] = value;
 
 	if (!out.writeStart(opt, filenames())) {
 		readStop();
@@ -2981,9 +2994,6 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 			}
 			if (!out.writeBlock(v, i)) return out;
 		}
-		//source[0].range_min.resize(1, 0 + plusone);
-		//source[0].range_max.resize(1, nrow() - 1 + plusone);
-		//source[0].hasRange.resize(1, true);
 	} else if (value == "col") {
 		std::vector<double> cnn(nc);
 		double start = plusone ? 1 : 0;
@@ -2996,9 +3006,6 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 			}
 			if (!out.writeBlock(v, i)) return out;
 		}
-		//source[0].range_min.resize(1, 0 + plusone);
-		//source[0].range_max.resize(1, nc - 1 + plusone);
-		//source[0].hasRange.resize(1, true);
 	} else if (value == "cell") {
 		for (size_t i = 0; i < out.bs.n; i++) {
 			v.resize(nc * out.bs.nrows[i]);
@@ -3007,10 +3014,6 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 			std::iota(v.begin(), v.end(), firstcell);
 			if (!out.writeBlock(v, i)) return out;
 		}
-		//source[0].range_min.resize(1, 0 + plusone);
-		//source[0].range_max.resize(1, ncell() - 1 + plusone);
-		//source[0].hasRange.resize(1, true);
-
 	} else if (value == "x") {
 		std::vector<int_64> col(nc);
 		std::iota(col.begin(), col.end(), 0);
@@ -3023,12 +3026,8 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 			}
 			if (!out.writeBlock(v, i)) return out;
 		}
-		//source[0].range_min.resize(1, xcoords[0]);
-		//source[0].range_max.resize(1, xcoords[nc-1]);
-		//source[0].hasRange.resize(1, true);
-
 	} else if (value == "y") {
-
+		
 		for (size_t i = 0; i < out.bs.n; i++) {
 			v.resize(out.bs.nrows[i] * nc );
 			for (size_t j = 0; j < out.bs.nrows[i]; j++) {
@@ -3039,10 +3038,6 @@ SpatRaster SpatRaster::init(std::string value, bool plusone, SpatOptions &opt) {
 			}
 			if (!out.writeBlock(v, i)) return out;
 		}
-		//source[0].range_min.resize(1, yFromRow(0));
-		//source[0].range_max.resize(1, yFromRow(nrow()-1));
-		//source[0].hasRange.resize(1, true);
-
 	} else if (value == "chess") {
 		std::vector<double> a(nc);
 		std::vector<double> b(nc);
@@ -3601,7 +3596,16 @@ SpatRaster SpatRaster::cropmask(SpatVector &v, std::string snap, bool touches, b
 		if (msk.hasError()) return msk;
 		out = out.mask(msk, false, 0, NAN, opt);	
 	} else {
-		setWindow(align(v.extent, snap));
+		SpatExtent e = align(v.extent, snap);
+		e = e.intersect(getExtent());
+		if (!e.valid_notempty() ) {
+			out.setError("extents do not overlap");
+			return out;
+		}
+		if (!setWindow(e)) {
+			out.setError(getError());
+			return out;
+		}
 		out = mask(v, false, NAN, touches, opt);	
 		removeWindow();		
 	}
@@ -4025,7 +4029,7 @@ SpatRaster SpatRasterCollection::merge(bool first, bool narm, int algo, std::str
 				out.setError(getError());
 				return out;
 			}
-			SpatRaster v(fname, {}, {}, {}, {}, {});
+			SpatRaster v(fname, {}, {}, {}, {}, false, false, {});
 			if (warnings.size() > 0) {
 				v.msg.warnings = warnings;
 				v.msg.has_warning = true;
@@ -4039,7 +4043,7 @@ SpatRaster SpatRasterCollection::merge(bool first, bool narm, int algo, std::str
 		
 		SpatOptions vopt(opt);
 		std::string fname = make_vrt(options, first, vopt);
-		SpatRaster v(fname, {}, {}, {}, {}, {});
+		SpatRaster v(fname, {}, {}, {}, {}, false, false, {});
 		v.setNames(ds[0].getNames(), false);
 
 		if (vopt.msg.warnings.size() > 0) {
