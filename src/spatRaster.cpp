@@ -36,7 +36,7 @@ SpatRaster::SpatRaster(std::string fname, std::vector<int> subds, std::vector<st
 }
 
 
-SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, bool multi, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<size_t> xyz, bool noflip, bool guessCRS, std::vector<std::string> domains) {
+SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, bool multi, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<int> dims, bool noflip, bool guessCRS, std::vector<std::string> domains) {
 
 	if (fname.empty()) {
 		setError("no filename");
@@ -45,7 +45,7 @@ SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, s
 
 #ifdef useGDAL
 	if (multi) {
-		constructFromFileMulti(fname[0], subds, subdsname, drivers, options, xyz);
+		constructFromFileMulti(fname[0], subds, subdsname, drivers, options, dims, noflip, guessCRS, domains);
 		return;
 	}
 
@@ -539,7 +539,7 @@ SpatRaster SpatRaster::sources_to_disk(std::vector<std::string> &tmpfs, bool uni
 	SpatOptions ops(opt);
 	for (size_t i=0; i<nsrc; i++) {
 		bool write = false;
-		if (!source[i].in_order() || source[i].memory) {
+		if (!source[i].in_order(true) || source[i].memory) {
 			write = true;
 		} else if (unique) {
 			ufs.insert(source[i].filename);
@@ -980,6 +980,17 @@ bool SpatRaster::hasUnit() {
 	}
 	return test;
 }
+
+
+std::vector<bool> SpatRaster::isMD() {
+	std::vector<bool> out;
+	out.reserve(source.size());
+	for (size_t i=0; i<source.size(); i++) {
+		out.push_back(source[i].is_multidim);
+	}
+	return out;
+}
+
 
 
 std::vector<std::string> SpatRaster::getUnit() {
@@ -1765,6 +1776,18 @@ std::vector<double> SpatRaster::yFromRow(const std::vector<int_64> &row) {
 	return result;
 }
 
+void SpatRaster::yFromRow(std::vector<double> &y) {
+	int_64 nr = nrow();
+	y.resize(nr);
+	SpatExtent extent = getExtent();
+	double ymax = extent.ymax;
+	double yr = yres();
+	for (int_64 i = 0; i<nr; i++) {
+		y[i] = ymax - ((i+0.5) * yr);
+	}
+}
+
+
 double SpatRaster::yFromRow (int_64 row) {
 	std::vector<int_64> rows = {row};
 	std::vector<double> y = yFromRow(rows);
@@ -1785,6 +1808,18 @@ std::vector<double> SpatRaster::xFromCol(const std::vector<int_64> &col) {
 	}
 	return result;
 }
+
+void SpatRaster::xFromCol(std::vector<double> &x) {
+	int_64 nc = ncol();
+	x.resize(nc);
+	SpatExtent extent = getExtent();
+	double xmin = extent.xmin;
+	double xr = xres();
+	for (int_64 i = 0; i<nc; i++) {
+		x[i] = xmin + ((i+0.5) * xr);
+	}
+}
+
 
 double SpatRaster::xFromCol(int_64 col) {
 	std::vector<int_64> cols = {col};

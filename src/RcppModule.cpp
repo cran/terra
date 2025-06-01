@@ -666,10 +666,12 @@ RCPP_MODULE(spat){
 	class_<SpatRaster>("SpatRaster")
 		.constructor()
 	 // .constructor<std::string, int>()
-		.constructor<std::vector<std::string>, std::vector<int>, std::vector<std::string>, bool, std::vector<std::string>, std::vector<std::string>, std::vector<size_t>, bool, bool, std::vector<std::string>>()
+		.constructor<std::vector<std::string>, std::vector<int>, std::vector<std::string>, bool, std::vector<std::string>, std::vector<std::string>, std::vector<int>, bool, bool, std::vector<std::string>>()
 		
 		.constructor<std::vector<size_t>, std::vector<double>, std::string>()
 		//.finalizer(&SpatRaster_finalizer)
+
+		.method("test", &SpatRaster::writeRasterM)
 
 		//.method("fromFiles", &SpatRaster::fromFiles)
 		.method("has_error", &SpatRaster::hasError)
@@ -767,6 +769,8 @@ RCPP_MODULE(spat){
 		.method("setNAflag", &SpatRaster::setNAflag)
 		.method("getNAflag", &SpatRaster::getNAflag)
 
+		.property("isMD", &SpatRaster::isMD)
+
 		.property("hasUnit", &SpatRaster::hasUnit)
 		.property("hasDepth", &SpatRaster::hasDepth)
 		.property("hasTime", &SpatRaster::hasTime)
@@ -786,6 +790,10 @@ RCPP_MODULE(spat){
 
 		.property("units", &SpatRaster::getUnit)
 		.method("set_units", &SpatRaster::setUnit)
+
+		.property("is_multidim", &SpatRaster::is_multidim)
+		.method("dim_names", &SpatRaster::dim_names)
+		.method("dim_size", &SpatRaster::dim_size)
 
 		.method("size", &SpatRaster::size, "size")
 		.method("nrow", &SpatRaster::nrow, "nrow")

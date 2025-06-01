@@ -1,4 +1,33 @@
+# version 1.8-54
+
+## bug fixes
+
+- `plot<SpatRaster>` using a value/color data.frame did not work correctly in all cases [#1827](https://github.com/rspatial/terra/issues/1827) by Alexandre Courtiol
+- `plot<SpatRaster>` argument "alpha" did not work properly [#1833](https://github.com/rspatial/terra/issues/1833) by strevisani
+- added the `-lnetcdf` flag needed for linking on some linuxes [#1829](https://github.com/rspatial/terra/issues/1829) by Guillermo A. Durán Sanabria
+- in some cases the last block used in raster processing was too large and led to memory issues [#1825](https://github.com/rspatial/terra/issues/1825) by Alex Ilich
+- `==<SpatRaster>` with multiple layers and categorical comparison failed [#1836](https://github.com/rspatial/terra/issues/1836) by Andrew Gene Brown
+- `wrteCDF` failed when writing tags with illegal characters such as "{" or "(", [#1811](https://github.com/rspatial/terra/issues/1811) by Catalin Sorin Covaci
+- `freq` failed for an empty SpatRaster [#1839](https://github.com/rspatial/terra/issues/1839) by Alex Ilich
+- `writeVector` with an empty SpatVector crashed R [#1837](https://github.com/rspatial/terra/issues/1837) by Induriel
+- `predict<SpatRaster>` could fail with na.rm=TRUE and a block with NA values only [#1843](https://github.com/rspatial/terra/issues/1843) by Alex Ilich
+- In some cases, `rast` interpreted a histogram attribute as a factor [#1845](https://github.com/rspatial/terra/issues/1845) by Tiago A. Marques
+
+## enhancements
+
+- `rast` with multiple files and lyrs argument now applies the argument to each data source (file); unless numbers higher than the number of layers of the first source are included. [#1838](https://github.com/rspatial/terra/issues/1838) by Pedro Tarroso
+
+
+## new
+
+- `unloadGDALdrivers` to disable selected GDAL drivers [#1828](https://github.com/rspatial/terra/issues/1828) by Andy Teucher
+- experimental support for the GDAL multidimensional raster data interface via `rast(md=TRUE)` 
+- `ar_info` to describe multidimensional (ncdf) raster files 
+
+
 # version 1.8-50
+
+Released 2025-05-09
 
 ## bug fixes
 - `rast(xyz=TRUE)` failed if there was no z variable [#1802](https://github.com/rspatial/terra/issues/1802) by Martin Jung

@@ -60,8 +60,8 @@ class SpatRasterSource {
 	public:
 #ifdef useGDAL
 		GDALDataset* gdalconnection;
-#if GDAL_VERSION_MAJOR >= 3 && GDAL_VERSION_MINOR >= 1	
-		GDALMDArrayH gdalmdarray;
+#if GDAL_VERSION_MAJOR >= 3 && GDAL_VERSION_MINOR >= 4
+		std::shared_ptr<GDALMDArray> m_array;
 #endif
 #endif
 		bool open_read=false;
@@ -84,17 +84,20 @@ class SpatRasterSource {
 		bool hasWindow=false;
 		SpatWindow window;
 	
-		bool multidim = false;
+		bool is_multidim = false;
+		std::string m_arrayname;
 		size_t m_ndims;
 		std::vector<size_t> m_dims;
-		std::vector<std::string> m_dimnames;
+		std::vector<std::string> m_names;
 //		std::vector<double> m_dimstart;
 //		std::vector<double> m_dimend;
-		std::vector<size_t> m_counts;
+		std::vector<size_t> m_size;
 		std::vector<size_t> m_order;
 		std::vector<size_t> m_subset;
 		bool m_hasNA = false;
 		double m_missing_value;
+		
+		
 		std::vector<std::vector<std::string>> bmdata;
 		std::vector<std::string> smdata;
 		
@@ -169,7 +172,7 @@ class SpatRasterSource {
 		void setRange();
 		void resize(size_t n);
 		void reserve(size_t n);
-		bool in_order();
+		bool in_order(bool all);
 		bool combine_sources(const SpatRasterSource &x);
 		bool combine(SpatRasterSource &x);
 		
@@ -272,6 +275,10 @@ class SpatRaster {
 		std::vector<int> getRGB();
 		void removeRGB();
 
+		std::vector<bool> is_multidim();
+		std::vector<std::vector<std::string>> dim_names();
+		std::vector<std::vector<size_t>> dim_order();
+		std::vector<std::vector<size_t>> dim_size();
 
 /*
 #ifdef useGDAL	
@@ -355,7 +362,7 @@ class SpatRaster {
 		bool setDepthName(std::string name);
 		std::string getDepthUnit();
 		bool setDepthUnit(std::string unit);
-
+		
 		bool hasUnit();
 		std::vector<std::string> getUnit();
 		bool setUnit(std::vector<std::string> units);
@@ -365,6 +372,7 @@ class SpatRaster {
 
 		std::vector<std::vector<std::string>> getMetadata(bool layers);
 
+		std::vector<bool> isMD();
 
 ////////////////////////////////////////////////////
 // constructors
@@ -373,7 +381,7 @@ class SpatRaster {
 		SpatRaster();
 		SpatRaster(size_t nr, size_t nc, size_t nl, SpatExtent ext, std::string crs);
 		SpatRaster(std::vector<size_t> rcl, std::vector<double> ext, std::string crs);
-		SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, bool multi, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<size_t> xyz, bool noflip, bool guessCRS, std::vector<std::string> domains);
+		SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, bool multi, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<int> dims, bool noflip, bool guessCRS, std::vector<std::string> domains);
 		SpatRaster(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip, bool guessCRS, std::vector<std::string> domains);
 		SpatRaster(SpatRasterSource &s);
 		virtual ~SpatRaster(){}
@@ -389,8 +397,8 @@ class SpatRaster {
 		SpatRaster geometry_opt(long nlyrs, bool properties, bool time, bool units, bool tags, bool datatype, SpatOptions &opt);
 
 		bool constructFromFile(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip, bool guessCRS, std::vector<std::string> domains);
-		bool constructFromFileMulti(std::string fname, std::vector<int> sub, std::vector<std::string> subname, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<size_t> xyz);
-		bool constructFromSDS(std::string filename, std::vector<std::string> meta, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> options, std::string driver, bool noflip, bool guessCRS, std::vector<std::string> domains	);
+		bool constructFromFileMulti(std::string fname, std::vector<int> subds, std::vector<std::string> subname, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<int> dims, bool noflip, bool guessCRS, std::vector<std::string> domains);
+		bool constructFromSDS(std::string filename, std::vector<std::string> meta, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> options, std::string driver, bool noflip, bool guessCRS, std::vector<std::string> domains);
 
 		
 		//SpatRaster fromFiles(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, std::string drivers, std::vector<std::string> options);
@@ -427,8 +435,10 @@ class SpatRaster {
 		double cellFromRowColCombine(int_64 row, int_64 col);
 		std::vector<double> yFromRow(const std::vector<int_64> &row);
 		double yFromRow(int_64 row);
+		void yFromRow(std::vector<double> &y);
 		std::vector<double> xFromCol(const std::vector<int_64> &col);
 		double xFromCol(int_64 col);
+		void xFromCol(std::vector<double> &x);
 
 		std::vector<int_64> colFromX(const std::vector<double> &x);
 		int_64 colFromX(double x);
@@ -537,14 +547,19 @@ class SpatRaster {
 		bool fillValuesGDAL(double fillvalue);
 		bool writeValuesGDAL(std::vector<double> &vals, size_t startrow, size_t nrows, size_t startcol, size_t ncols);
 		bool writeStopGDAL();
+		
+		bool writeStartMulti(SpatOptions &opt, const std::vector<std::string> &srcnames);
+		bool writeValuesMulti(std::vector<double> &vals, size_t startrow, size_t nrows, size_t startcol, size_t ncols);
+		bool writeStopMulti();
+		
 		bool getTempFile(std::string &filename, std::string &driver, SpatOptions& opt);
-
 
 		bool readStartMulti(size_t src);
 		bool readStopMulti(size_t src);
-		bool readValuesMulti(std::vector<double> &out, size_t src, size_t row, size_t nrows, size_t col, size_t ncols);
-
-
+		bool readChunkMulti(std::vector<double> &data, size_t src, size_t row, size_t nrows, size_t col, size_t ncols);
+		std::vector<double> readValuesMulti(size_t src, size_t row, size_t nrows, size_t col, size_t ncols, int lyr);
+		std::vector<double> readSampleMulti(size_t src, size_t srows, size_t scols, bool overview);
+		bool readRowColMulti(size_t src, std::vector<std::vector<double>> &out, size_t outstart, std::vector<int_64> &rows, const std::vector<int_64> &cols);
 
 		//bool writeStartBinary(std::string filename, std::string datatype, std::string bandorder, bool overwrite);
 		//bool writeValuesBinary(std::vector<double> &vals, size_t startrow, size_t nrows, size_t startcol, size_t ncols);
@@ -582,6 +597,7 @@ class SpatRaster {
 		void openFS(std::string const &filename);
 
 		SpatRaster writeRaster(SpatOptions &opt);
+		SpatRaster writeRasterM(SpatOptions &opt);
 		SpatRaster writeTempRaster(SpatOptions &opt);
 		bool writeDelim(std::string filename, std::string delim, bool cell, bool xy, SpatOptions &opt);
 		bool update_meta(bool names, bool crs, bool ext, SpatOptions &opt);

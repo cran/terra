@@ -238,8 +238,49 @@ clean_domains <- function(domains) {
 	domains
 }
 
+
+multi <- function(x, subds=1, dims=NULL, drivers=NULL, opts=NULL, win=NULL, snap="near", vsi=FALSE, raw=FALSE, noflip=FALSE, guessCRS=TRUE, domains="") {
+
+	f <- .fullFilename(x, vsi=isTRUE(vsi))
+	if (length(f) == 0) {
+		error("multi", "filename is empty. Provide a valid filename")
+	}
+
+	if (is.null(opts)) opts <- ""[0]
+	if (isTRUE(raw)) opts <- c(opts, "so=false")
+	
+	if (is.null(drivers)) drivers <- ""[0]
+
+	domains <- clean_domains(domains)
+	if (is.null(dims)) dims <- 0
+		
+	r <- methods::new("SpatRaster")
+	if (is.character(subds)) {
+		r@pntr <- SpatRaster$new(f, -1, subds, TRUE, drivers, opts, dims-1, isTRUE(noflip), isTRUE(guessCRS), domains)
+	} else {
+		if (subds < 1) subds = 1
+		r@pntr <- SpatRaster$new(f, subds-1, ""[0], TRUE, drivers, opts, dims-1, isTRUE(noflip), isTRUE(guessCRS), domains)
+	}
+	messages(r, "rast (multi)")
+}
+
+
 setMethod("rast", signature(x="character"),
-	function(x, subds=0, lyrs=NULL, drivers=NULL, opts=NULL, win=NULL, snap="near", vsi=FALSE, raw=FALSE, noflip=FALSE, guessCRS=TRUE, domains="") {
+	function(x, subds=0, lyrs=NULL, drivers=NULL, opts=NULL, win=NULL, snap="near", vsi=FALSE, raw=FALSE, noflip=FALSE, guessCRS=TRUE, domains="", md=FALSE, dims=NULL) {
+
+		if (isTRUE(md)) {
+			if (!is.null(win)) {
+				error("rast", "argument 'win' is ignored if 'multi=TRUE'")			
+			}
+			if (length(x) > 1) {
+				error("rast", "only a single filename can be used if 'multi=TRUE'")
+			}
+			r <- multi(x, subds, dims=dims, drivers=drivers, opts=opts, vsi=vsi, raw=raw, noflip=noflip, guessCRS=guessCRS, domains=domains)
+			if (!is.null(lyrs)) {
+				r <- r[[lyrs]]
+			}
+			return(r)
+		}
 
 		f <- .fullFilename(x, vsi=vsi)
 		if (length(f) == 0) {
@@ -260,7 +301,7 @@ setMethod("rast", signature(x="character"),
 		if (is.null(opts)) opts <- ""[0]
 		if (raw) opts <- c(opts, "so=false")
 		if (is.null(drivers)) drivers <- ""[0]
-		if (length(subds) == 0) subds = 0
+		if (length(subds) == 0) subds <- 0
 		if (is.character(subds)) {
 			r@pntr <- SpatRaster$new(f, -1, subds, FALSE, drivers, opts, 0[], isTRUE(noflip), isTRUE(guessCRS), domains)
 		} else {
@@ -272,11 +313,25 @@ setMethod("rast", signature(x="character"),
 			test <- try(r <- .ncdf_extent(r, f), silent=TRUE)
 			if (inherits(test, "try-error")) {
 				warn("rast", "GDAL did not find an extent. Cells not equally spaced?")
+			} else if (isTRUE(guessCRS)) {
+				if (crs(r) == "") {
+					e <- ext(r)
+					if ((e$xmin >= -180) && (e$xmax <= 360) && (e$ymin >= -90) && (e$ymax <= 90)) {
+						crs(r) <- "OGC:CRS84"
+					}
+				}
 			}
 		}
 		r <- messages(r, "rast")
 
+		
 		if (!is.null(lyrs)) {
+			if (length(f) > 1) {
+				s <- sources(r, FALSE, TRUE)
+				if (max(lyrs) <= max(s$bands[s$sid == 1])) {
+					lyrs <- which(!is.na(match(s$bands, lyrs)))
+				}
+			}
 			r <- r[[lyrs]]
 		} 
 		if (!is.null(win)) {
@@ -287,44 +342,6 @@ setMethod("rast", signature(x="character"),
 		r
 	}
 )
-
-
-multi <- function(x, subds=0, xyz=3:1, guessCRS=TRUE, drivers=NULL, opts=NULL) {
-
-	noflip <- FALSE
-
-	x <- trimws(x)
-	x <- x[x!=""]
-	if (length(x) == 0) {
-		error("rast,character", "provide a valid filename")
-	}
-	r <- methods::new("SpatRaster")
-	f <- .fullFilename(x)
-	if (is.null(opts)) opts <- ""[0]
-	if (is.null(drivers)) drivers <- ""[0]
-	if (length(subds) == 0) subds = 1
-	subds <- subds[1]
-
-	if (is.character(subds)) {
-		r@pntr <- SpatRaster$new(f, -1, subds, TRUE, drivers, opts, xyz-1, isTRUE(noflip), isTRUE(guessCRS))
-	} else {
-		r@pntr <- SpatRaster$new(f, subds-1, ""[0], TRUE, drivers, opts, xyz-1, isTRUE(noflip), isTRUE(guessCRS))
-	}
-	if (r@pntr$getMessage() == "ncdf extent") {
-		test <- try(r <- .ncdf_extent(r), silent=TRUE)
-		if (inherits(test, "try-error")) {
-			warn("rast", "GDAL did not find an extent. Cells not equally spaced?")
-		}
-	}
-	r <- messages(r, "rast")
-
-	if (crs(r) == "") {
-		if (is.lonlat(r, perhaps=TRUE, warn=FALSE)) {
-			crs(r) <- "OGC:CRS84"
-		}
-	}
-	r
-}
 
 
 setMethod("rast", signature(x="SpatRaster"),
