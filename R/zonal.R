@@ -371,7 +371,7 @@ setMethod("global", signature(x="SpatRaster"),
 
 
 setMethod("freq", signature(x="SpatRaster"),
-	function(x, digits=0, value=NULL, bylayer=TRUE, usenames=FALSE, zones=NULL, wide=FALSE) {
+	function(x, digits=0, value=NULL, bylayer=TRUE, usenames=FALSE, zones=NULL, wide=FALSE, touches=FALSE) {
 		
 		if (!hasValues(x)) {
 			warn("freq", "SpatRaster x has no cell values")
@@ -388,13 +388,16 @@ setMethod("freq", signature(x="SpatRaster"),
 					z <- zones[i,]
 					e <- align(ext(z), x, snap="near")
 					if (!is.null(intersect(e, ext(x)))) {
-						r <- crop(x, zones[i,], mask=TRUE, touches=FALSE)
+						r <- crop(x, zones[i,], mask=TRUE, touches=touches, snap="out")
 						if (vna) {
-							ra <- rasterize(zones[i,], r, NA, background=0, touches=FALSE)
+							ra <- rasterize(zones[i,], r, NA, background=0, touches=touches)
 							r <- cover(ra, r)
 						}
-						out[[i]] <- freq(r, digits=digits, value=value, bylayer=bylayer, usenames=usenames, zones=NULL)
-						out[[i]]$zone <- i
+						f <- freq(r, digits=digits, value=value, bylayer=bylayer, usenames=usenames, zones=NULL)
+						if (nrow(f) > 0) {
+							f$zone <- i	
+							out[[i]] <- f
+						}
 					}
 				}
 			} else if (inherits(zones, "SpatRaster")) {
@@ -407,8 +410,11 @@ setMethod("freq", signature(x="SpatRaster"),
 				out <- vector("list", length(u))
 				for (i in 1:length(u)) {
 					r <- mask(x, zones, maskvalues=u[i], inverse=TRUE)
-					out[[i]] <- freq(r, digits=digits, value=value, bylayer=bylayer, usenames=usenames, zones=NULL, wide=FALSE)
-					out[[i]]$zone <- i
+					f <- freq(r, digits=digits, value=value, bylayer=bylayer, usenames=usenames, zones=NULL, wide=FALSE)
+					if (nrow(f) > 0) {
+						f$zone <- i	
+						out[[i]] <- f
+					}
 				}
 			} else {
 				error("freq", "zones must be a SpatVector or a SpatRaster")
