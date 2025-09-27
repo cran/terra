@@ -1,4 +1,32 @@
+# version 1.8-70
+
+## bug fixes
+
+- `project(mask=TRUE)` could fail with high-resolution global rasters because of date-line flipping [SO 79708536](https://stackoverflow.com/q/79708536/635245) by Patrick
+- `plot(pax=list(mgp=c(1,1,2))` now sets mgp seperately for horizontal and vertical axes [#1873](https://github.com/rspatial/terra/issues/1873) by Hu shiyu
+- `coltab(x, ..., layer=1)<-` argument layer did not work for layer names [#1879](https://github.com/rspatial/terra/issues/1879) by Alex Ilich
+- `sds` could create a SpatRasterDataset with SpatRasters with different spatial resolutions [#1884](https://github.com/rspatial/terra/issues/1884) by Stefan Fallert
+- `identical` did not consider NA values [#1890](https://github.com/rspatial/terra/issues/1890) by Facundo Muñoz
+- `add_grid` did not respect the clipping region if a second raster was added with `add=TRUE` [#1889](https://github.com/rspatial/terra/issues/1889) by Lucas Salinas Morales
+- `rast(x, type = "xyz")` did not inherit CRS from a SpatVector [#1886](https://github.com/rspatial/terra/issues/1886) by Danielle Ferraro
+- `distance(values = TRUE)` returned unexpected results [#1891](https://github.com/rspatial/terra/issues/1891) by Jason Flower
+- `plot` with arguments for a continuous legend failed if no such legend was drawn [#1897](https://github.com/rspatial/terra/issues/1897) by François Rousseu
+
+## enhancements
+
+- when computing aggregated time steps such as days from POSIXct (seconds) time, terra now uses the date in the specified time zone, unlike base `as.Date` that seems to return the date in the UTC time zone [#1896](https://github.com/rspatial/terra/issues/1896) by Kodi Arfer
+- better support for creating a SpatVector with an EMPTY wkt geometry [#1903](https://github.com/rspatial/terra/issues/1903) by Anatolii Tsyplenkov
+- `makeTiles` gains argument "value" to set the returned value to be the filenames (default), a SpatRaster or a SpatRasterCollection [#1894](https://github.com/rspatial/terra/issues/1894) by Márcia Barbosa
+
+## new
+
+- it is now possible to create a SpatVector from Well Known Binary (WKB) data [#1895](https://github.com/rspatial/terra/pull/1895) by Jan Hartman
+- `resample` now also accepts, instead of a template SpatRaster, one or two numbers to set the resolution of the output SpatRaster [#1874](https://github.com/rspatial/terra/pull/1874) by Agustin Lobo
+
+
 # version 1.8-60
+
+Released 2025-07-18
 
 ## bug fixes
 
@@ -243,7 +271,7 @@ Released 2024-12-12
 - `plet<SpatRaster>` now works for RGB rasters and rasters with a color table [#1596](https://github.com/rspatial/terra/issues/1596) by Agustin Lobo
 - `vect<MULTIPOINT WKT>` did not work properly [#1376](https://github.com/rspatial/terra/issues/1376) by silasprincipe
 - `compareGeom<SpatVector>` did not work [#1654](https://github.com/rspatial/terra/issues/1654) by Jason Flower
-- `buffer<SpatVector>` is now more accurate buffers for lonlat polygons [#1616](https://github.com/rspatial/terra/issues/1616) by Roberto Amaral-Santos
+- `buffer<SpatVector>` is now more accurate for lonlat polygons [#1616](https://github.com/rspatial/terra/issues/1616) by Roberto Amaral-Santos
 - `terra:interpNear` used square windows, not circles, beyond 100 points [#1509](https://github.com/rspatial/terra/issues/1509) by Jean-Luc Dupouey
 - `vect` read INT64 fields as integers, sometimes leading to overflows. [#1666](https://github.com/rspatial/terra/issues/1666) by bengannon-fc
 - `plot` showed a legend title even if none was requested if title parameters were specified . [#1664](https://github.com/rspatial/terra/issues/1664) by Márcia Barbosa
@@ -297,7 +325,7 @@ Released 2024-10-14
 - argument `fill_range` to plot<SpatRaster> and `plot<SpatVector>` to use the color of the extreme values of the specified range [#1553](https://github.com/rspatial/terra/issues/1553) by Mike Koontz
 - `plet<SpatRaster>` can now handle rasters with a "local" (Cartesian) CRS. [#1570](https://github.com/rspatial/terra/issues/1570) by Augustin Lobo.
 - `geom` can now return "wkb" [#1609](https://github.com/rspatial/terra/issues/1609)
-- faster plotting when color names are used. In response to question by Olle on [gis.stackexchange.com](https://gis.stackexchange.com/questions/487112/plotting-discrete-categorical-rasters-with-custom-colors-slows-down-r-terra/488012#488012)
+- faster plotting when color names are used. In response to question by Olle on [gis.stackexchange.com](https://gis.stackexchange.com/questions/487112/plotting-discrete-categorical-rasters-with-custom-colors-slows-down-r-terra/488012)
 
 ## new 
 
