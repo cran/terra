@@ -1,4 +1,54 @@
 
+zebra <- function(cex=1, x=NULL, y=NULL, width=NULL, col=c("black", "white")) {
+
+	clip <- get.clip()
+	axs <- unlist(clip)[1:4]
+	if (is.null(width)) {
+		width <- rep(min(axs[2]-axs[1], axs[4]-axs[3]) / 100, 2) * cex
+		if (clip$geo) {
+			asp <- 1/cos((mean(axs[3:4]) * pi)/180)
+			width[2] <- width[2] / asp
+		} 
+	} else {
+		width <- rep(width, length.out=2)
+	}
+	
+	if (is.null(x)) {
+		x <- g.grid.at(1L, NULL, axp=graphics::par("xaxp"), usr2=graphics::par("usr")[1:2])
+		#x = graphics::.grid.at(1L, NULL, log=FALSE, equilogs=TRUE, axp=par("xaxp"), usr2=par("usr")[1:2])
+	} 
+	if (is.null(y)) {
+		y <- g.grid.at(2L, NULL, axp=graphics::par("yaxp"), usr2=graphics::par("usr")[1:2])
+		#y = graphics:::.grid.at(2L, NULL, log=FALSE, equilogs=TRUE, axp=par("yaxp"), usr2=par("usr")[1:2])
+	}
+	
+	x <- sort(unique(c(axs[1:2], x)))
+	x <- x[x >= axs[1] & x <= axs[2]]
+	y <- sort(unique(c(axs[3:4], y)))
+	y <- y[y >= axs[3] & y <= axs[4]]
+	
+	v1 <- vect(lapply(1:(length(y)-1), function(i) {
+			as.polygons(ext(axs[1], axs[1]+width[1], y[i], y[i+1]))
+		}))
+	v1$col <- rep(col, length.out=nrow(v1))
+	v2 <- shift(v1, axs[2]-axs[1]-width[1], 0)
+	
+	h1 <- vect(lapply(1:(length(x)-1), function(i) {
+			as.polygons(ext(x[i], x[i+1], axs[3], axs[3]+width[2]))
+		}))
+		
+	h1$col <- rep(col, length.out=nrow(v1))
+	h2 <- shift(h1, 0, axs[4]-axs[3]-width[2])
+	
+	z <- rbind(v1, v2, h1, h2)
+	polys(z, col=z$col, border=NA, xpd=TRUE)
+	e <- c(axs[1] + width[1], axs[2] - width[1], axs[3] + width[2], axs[4] - width[2])
+	lines(ext(e), xpd=TRUE)
+	lines(ext(axs), xpd=TRUE)
+	try(set.clip(e, clip$geo))
+}
+
+
 retro_labels <- function(x, lat=TRUE) {
 	if ((is.null(x)) || (!is.numeric(x))) {
 		return(x)
@@ -35,6 +85,26 @@ retro_labels <- function(x, lat=TRUE) {
 
 
 .plot.axes <- function(x) {
+
+	if (x$clip) {
+		usr <- x$lim
+	} else {
+		usr <- graphics::par("usr")
+	}
+
+	if (x$xlab != "") {
+		posx <- usr[1] + diff(usr[1:2])/2
+		text(posx, usr[3], x$xlab, pos=1, offset=x$axs$line.lab, cex=x$axs$cex.lab, xpd=TRUE)
+	}
+	if (x$ylab != "") {
+		posy <- usr[3] + diff(usr[3:4])/2
+		text(usr[1], posy, x$ylab, pos=2, offset=x$axs$line.lab, srt=90, cex=x$axs$cex.lab, xpd=TRUE)
+	}
+	
+
+	if (!x$axes) {
+		return(x)
+	}
 
 	if (is.null(x$axs$cex.axis)) {
 		x$axs$cex.axis = 1
@@ -96,11 +166,6 @@ retro_labels <- function(x, lat=TRUE) {
 		x$axs$lab <- labs <- sides
 	}
 
-	if (x$clip) {
-		usr <- x$lim
-	} else {
-		usr <- graphics::par("usr")
-	}
 	
 	y <- x$axs
 	retro <- isTRUE(y$retro) 
@@ -112,7 +177,7 @@ retro_labels <- function(x, lat=TRUE) {
 	y$line <- NA
 	y$outer <- FALSE
 	y$line.lab <- NULL
-	if (is.null(y$col)) y$col <- "black"
+	if (is.null(y$col)) y$col <- "gray"
 	if (x$clip) {
 		lnpts <- crds(as.points(ext(x$lim)))
 		lnpts <- rbind(lnpts[4,], lnpts)
@@ -131,7 +196,9 @@ retro_labels <- function(x, lat=TRUE) {
 				axt <- graphics::axTicks(s)
 				y$at <- axt[axt >= usr[1] & axt <= usr[2]]
 			} else {
-				y$at <- xat
+				i <- (!is.na(xat)) & (xat >= usr[1]) & (xat <= usr[2])
+				y$at <- xat[i]
+				xlab <- xlab[i]
 			}
 			if (is.null(xlab)) {
 				y$labels <- if (retro) retro_labels(y$at, lat=FALSE) else y$at
@@ -144,7 +211,7 @@ retro_labels <- function(x, lat=TRUE) {
 				clp <- get.clip()
 				if (!is.null(clp)) {
 					for (i in seq_along(y$at)) {
-						lines(rbind(c(y$at[i], clp[3]), c(y$at[i], clp[4])), col=y$col)
+						lines(rbind(c(y$at[i], clp[3]), c(y$at[i], clp[4])), col=y$col, lty=y$lty, lwd=y$lwd)
 					}
 				}
 			}
@@ -155,7 +222,9 @@ retro_labels <- function(x, lat=TRUE) {
 				axt <- graphics::axTicks(s)
 				y$at <- axt[axt >= usr[3] & axt <= usr[4]]
 			} else {
-				y$at <- yat
+				i <- (!is.na(yat)) & (yat >= usr[3]) & (yat <= usr[4])
+				y$at <- yat[i]
+				ylab <- ylab[i]
 			}
 			if (is.null(ylab)) {
 				y$labels <- if (retro) retro_labels(y$at, lat=TRUE) else y$at
@@ -168,7 +237,7 @@ retro_labels <- function(x, lat=TRUE) {
 				clp <- get.clip()
 				if (!is.null(clp)) {
 					for (i in seq_along(y$at)) {
-						lines(rbind(c(clp[1], y$at[i]), c(clp[2], y$at[i])), col=y$col)
+						lines(rbind(c(clp[1], y$at[i]), c(clp[2], y$at[i])), lty=y$lty, col=y$col, lwd=y$lwd)
 					}
 				}
 			}
@@ -195,7 +264,7 @@ retro_labels <- function(x, lat=TRUE) {
 			} else {
 				lty <- y$lty
 			}
-			lines(lin, y$lwd, lty=lty, col=y$col)
+			lines(lin, lwd=y$lwd, lty=lty, col=y$col)
 		
 			#d <- diff(edg) * 10
 			#z$at <- edg + c(-d, d)
@@ -205,15 +274,8 @@ retro_labels <- function(x, lat=TRUE) {
 		} 
 	}
 	
-	if (x$xlab != "") {
-		posx <- usr[1] + diff(usr[1:2])/2
-		text(posx, usr[3], x$xlab, pos=1, offset=x$axs$line.lab, cex=x$axs$cex.lab, xpd=TRUE)
-	}
-	if (x$ylab != "") {
-		posy <- usr[3] + diff(usr[3:4])/2
-		text(usr[1], posy, x$ylab, pos=2, offset=x$axs$line.lab, srt=90, cex=x$axs$cex.lab, xpd=TRUE)
-	}
-	
+	x$axs$xat <- xat 
+	x$axs$yat <- yat
 	x
 }
 

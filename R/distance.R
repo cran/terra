@@ -4,9 +4,9 @@
 # License GPL v3
 
 setMethod("buffer", signature(x="SpatRaster"),
-	function(x, width, background=0, filename="", ...) {
+	function(x, width, background=0, include=TRUE, filename="", ...) {
 		opt <- spatOptions(filename, ...)
-		x@pntr <- x@pntr$buffer(width, background, opt)
+		x@pntr <- x@pntr$buffer(width, background, include, opt)
 		messages(x, "buffer")
 	}
 )
@@ -127,7 +127,7 @@ mat2wide <- function(m, sym=TRUE, keep=NULL) {
 }
 
 setMethod("distance", signature(x="SpatVector", y="ANY"),
-	function(x, y, sequential=FALSE, pairs=FALSE, symmetrical=TRUE, unit="m", method="haversine", use_nodes=FALSE) {
+	function(x, y, sequential=FALSE, pairs=FALSE, symmetrical=TRUE, unit="m", method="haversine", use_nodes=FALSE, names=NULL) {
 		if (!missing(y)) {
 			error("distance", "If 'x' is a SpatVector, 'y' should be a SpatVector or missing")
 		}
@@ -143,6 +143,14 @@ setMethod("distance", signature(x="SpatVector", y="ANY"),
 		attr(d, "Diag") <- FALSE
 		attr(d, "Upper") <- FALSE
 		attr(d, "method") <- "spatial"
+		if (!is.null(names)) {
+			if (inherits(names, "character") && (length(names) == 1)) {
+				names <- x[[names, drop=TRUE]]
+			}
+			if (length(names) == nrow(x)) {
+				attr(d, "Labels") <- names
+			}
+		}
 		if (pairs) {
 			d <- as.matrix(d)
 			diag(d) <- NA
@@ -154,7 +162,7 @@ setMethod("distance", signature(x="SpatVector", y="ANY"),
 
 
 setMethod("distance", signature(x="SpatVector", y="SpatVector"),
-	function(x, y, pairwise=FALSE, unit="m", method = "haversine", use_nodes=FALSE) {
+	function(x, y, pairwise=FALSE, unit="m", method = "haversine", use_nodes=FALSE, names=NULL) {
 		unit <- as.character(unit[1])
 		method <- match.arg(tolower(method), c("cosine", "haversine", "geo"))
 		opt <- spatOptions()
@@ -162,6 +170,15 @@ setMethod("distance", signature(x="SpatVector", y="SpatVector"),
 		messages(x, "distance")
 		if (!pairwise) {
 			d <- matrix(d, nrow=nrow(x), ncol=nrow(y), byrow=TRUE)
+			if ((!is.null(names)) && (length(names)<=2)) {
+				names <- rep(names, length.out=2)
+				if (inherits(names[1], "character")) {
+					rownames(d) <- x[[names[1], drop=TRUE]]
+				}
+				if (inherits(names[2], "character")) {
+					colnames(d) <- y[[names[2], drop=TRUE]]
+				}
+			}
 		}
 		d
 	}

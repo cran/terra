@@ -1,4 +1,41 @@
+# version 1.8-80
+
+## bug fixes
+
+- `plot<SpatRaster>` with arguments "break=n" and "breakby='cases'" could break if there the number of computed quantile breaks is lower than expected because of duplicates [#1913](https://github.com/rspatial/terra/pull/1913) by Bradley W. Compton
+- `buffer<SpatRaster>` for lon/lat rasters did not include the non `NA` cells outside of the buffer distance from the edges as part of the buffer [#1929](https://github.com/rspatial/terra/issues/1929) by Márcia Barbosa
+- computing dates for years < 1 failed (regression introduced when fixing #1896) [#1951](https://github.com/rspatial/terra/issues/1951) by Taras Zakharko
+- computing dates for 365 day calendars was not accurate in some cases [#1951](https://github.com/rspatial/terra/issues/1951) by Taras Zakharko
+- `values(x[["name"]])<-` failed if `x` had a single layer [#1944](https://github.com/rspatial/terra/issues/1944) by Wenbo Lv
+- colors specified in a vat.dbf file were no longer extracted due to a change in GDAL [#1943](https://github.com/rspatial/terra/issues/1943) by Josh O'Brien
+- `buffer<SpatVector>` with lon/lat coordinates did not behave well for very large buffers; especially around areas near the dateline [#1926](https://github.com/rspatial/terra/issues/1926) by Márcia Barbosa
+- `mask<SpatRaster,SpatVector>` "inverse=TRUE" lost the layernames. [#1959](https://github.com/rspatial/terra/issues/1959) by Alex Ilich
+
+## enhancements
+
+- `plet<SpatRaster>` can (again) use a color function returned by `leaflet::colorNumeric` [#1904](https://github.com/rspatial/terra/issues/1904) by Ignacio Marzan
+- argument `animate<SpatRaster>` can now be set to `NA` to not get a shared legend [#1909](https://github.com/rspatial/terra/pull/1909) by Márcia Barbosa
+- `text<SpatRaster>` and `text<SpatVector>` gained argument "jitter=0" [#1910](https://github.com/rspatial/terra/pull/1910) by Márcia Barbosa
+- `points<SpatVector>` gained argument "jitter=0"
+- `plet<SpatRaster>` gained arguments "range" and "fill_range" 
+- `unique<SpatVector>` gained arguments "geom=TRUE" and "atts=TRUE" to allow uniqueness to be based on geometry or attributes only [#1928](https://github.com/rspatial/terra/issues/1928) by Andrea Titolo
+- `buffer<SpatRaster>` gains argument "include=TRUE" to allow exclusion of the cells that are not `NA` from the buffer  [#1929](https://github.com/rspatial/terra/issues/1929) by Márcia Barbosa
+- argument "names" to `distance<SpatVector,missing>` [#1942](https://github.com/rspatial/terra/issues/1942) by Márcia Barbosa
+- `subset<SpatVector>` now works without a value for argument "subset", to allow subsetting variables only [#1953](https://github.com/rspatial/terra/issues/1953) by Márcia Barbosa
+
+
+## new
+
+- `plet<SpatRasterCollection>` method
+- `cartogram<SpatRaster>` can now return a "circles" (dorling) cartogram [#1911](https://github.com/rspatial/terra/issues/1911) by Márcia Barbosa 
+- `subset<SpatVector>` can now use a Spat object to spatially subset [#1937](https://github.com/rspatial/terra/issues/1937) by Márcia Barbosa
+- `plot<SpatRaster>` and `plot<SpatVector>` have new argument "zebra=FALSE", to create a zebra-box. [https://github.com/rspatial/terra/issues/1956](https://github.com/rspatial/terra/issues/1956) by Lucas Salinas Morales
+
+
+
 # version 1.8-70
+
+Released 2025-09-27
 
 ## bug fixes
 

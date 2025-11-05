@@ -10,6 +10,7 @@
 
 \description{
 Aggregate a SpatRaster to create a new SpatRaster with a lower resolution (larger cells). Aggregation groups rectangular areas to create larger cells. The value for the resulting cells is computed with a user-specified function. 
+See \code{\link{resample}} for aggregating cells with a factor that is not an integer.
 
 You can also aggregate ("dissolve") a SpatVector. This either combines all geometries into one geometry, or it combines the geometries that have the same value for the variable(s) specified with argument \code{by}.
 }
@@ -21,7 +22,7 @@ You can also aggregate ("dissolve") a SpatVector. This either combines all geome
 }
 
 \arguments{
-  \item{x}{SpatRaster}
+  \item{x}{SpatRaster or SpatVector}
   \item{fact}{positive integer. Aggregation factor expressed as number of cells in each direction (horizontally and vertically). Or two integers (vertical (fact[1]) and horizontal (fact[2]) aggregation factor) or three integers (when also aggregating over layers)}  
   \item{fun}{function used to aggregate values. Either an actual function, or for the following, their name: "mean", "max", "min", "median", "sum", "modal", "any", "all", "prod", "which.min", "which.max", "table", "sd" (sample standard deviation) and "std" (population standard deviation)}
   \item{...}{additional arguments passed to \code{fun}, such as \code{na.rm=TRUE}}  

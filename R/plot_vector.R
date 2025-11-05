@@ -337,11 +337,22 @@ setMethod("dots", signature(x="SpatVector"),
 .plot.vect.map <- function(x, out, ...) {
 
 	if ((!out$add) & (!out$legend_only)) {
+		if (out$zebra) {
+			width <- rep(min(diff(out$lim[1:2]), diff(out$lim[3:4])) / 100, 2) * out$zebra.cex
+			if (out$lonlat) {
+				asp <- 1/cos((mean(out$lim[3:4]) * pi)/180)
+				width[2] <- width[2] / asp
+			}
+			out$lim[1:2] <- out$lim[1:2] + c(-width[1], width[1])
+			out$lim[3:4] <- out$lim[3:4] + c(-width[2], width[2])
+		}
 		if (!any(is.na(out$mar))) { graphics::par(mar=out$mar) }
 		plot(out$lim[1:2], out$lim[3:4], type="n", xlab="", ylab="", asp=out$asp, xaxs="i", yaxs="i", axes=FALSE, main="")
 		if (!is.null(out$background)) {
 			graphics::rect(out$lim[1], out$lim[3], out$lim[2], out$lim[4], col=out$background, border=x$box)
 		}
+	} else {
+		x$zebra <- FALSE
 	}
 	if (isTRUE(out$blank)) return(out)
 	
@@ -379,12 +390,10 @@ setMethod("dots", signature(x="SpatVector"),
 		if (!out$add) {
 			try(set.clip(out$lim, out$lonlat))
 		}
+		out <- .plot.axes(out)
 		out <- .vplot(x, out, ...)
 	}
 
-	if (out$axes) {
-		out <- .plot.axes(out)
-	}
 
 	if (out$legend_draw) {
 		if (out$legend_type == "continuous") {
@@ -409,6 +418,13 @@ setMethod("dots", signature(x="SpatVector"),
 			out$legpars <- do.call(.plot.class.legend, out$leg)
 		}
 	}
+
+	if (out$zebra) {
+		zebra(width=width, x=out$axs$xat, y=out$axs$yat, col=out$zebra.col)
+		out$lim[1:2] <- out$lim[1:2] + c(width[1], -width[1])
+		out$lim[3:4] <- out$lim[3:4] + c(width[2], -width[2])
+	}
+
 	if (isTRUE(out$box)) { 
 		if (out$clip) {
 			lines(ext(out$lim))	
@@ -435,7 +451,8 @@ setMethod("dots", signature(x="SpatVector"),
 .prep.vect.data <- function(x, y, type=NULL, cols=NULL, mar=NULL, legend=TRUE,
 	legend.only=FALSE, levels=NULL, add=FALSE, range=NULL, fill_range=FALSE, breaks=NULL, breakby="eqint",
 	xlim=NULL, ylim=NULL, colNA=NA, alpha=NULL, axes=TRUE, buffer=TRUE, background=NULL,
-	pax=list(), plg=list(), ext=NULL, grid=FALSE, las=0, sort=TRUE, reverse=FALSE, values=NULL,
+	pax=list(), plg=list(), ext=NULL, grid=FALSE, zebra=FALSE, zebra.cex=1, zebra.col=c("black", "white"), 
+	las=0, sort=TRUE, reverse=FALSE, values=NULL,
 	box=TRUE, xlab="", ylab="", cex.lab=0.8, line.lab=1.5, yaxs="i", xaxs="i", 
 	main="", cex.main=1.2, line.main=0.5, font.main=graphics::par()$font.main, col.main = graphics::par()$col.main, loc.main=NULL, 
     sub = "", font.sub=1, cex.sub=0.8*cex.main, line.sub =1.75,  col.sub=col.main, loc.sub=NULL,
@@ -528,6 +545,10 @@ setMethod("dots", signature(x="SpatVector"),
 	out$dig.lab <- dig.lab
 
 	out$box <- isTRUE(box)
+	out$zebra <- isTRUE(zebra)
+	out$zebra.cex <- zebra.cex
+	out$zebra.col <- zebra.col
+	
 	out$add <- isTRUE(add)
 	out$axes <- isTRUE(axes)
 	out$xlab <- xlab
@@ -684,7 +705,7 @@ setMethod("dots", signature(x="SpatVector"),
 
 setMethod("plot", signature(x="SpatVector", y="character"),
 	function(x, y, col=NULL, type=NULL, mar=NULL, legend=TRUE, axes=!add, plg=list(), pax=list(), 
-    main="", grid=FALSE, ext=NULL, sort=TRUE, reverse=FALSE, fun=NULL,
+    main="", grid=FALSE, zebra=FALSE, ext=NULL, sort=TRUE, reverse=FALSE, fun=NULL,
 	colNA=NA, alpha=NULL, nr, nc, add=FALSE, buffer=TRUE, background=NULL, 
 	box=axes, clip=TRUE, ...) {
 
@@ -740,7 +761,7 @@ setMethod("plot", signature(x="SpatVector", y="character"),
 
 			if (missing(col)) col <- NULL
 
-			out <- .prep.vect.data(x, y[i], type=type, cols=col, mar=mar, plg=plg, pax=pax, legend=isTRUE(legend), add=add, axes=axes, main=main[i], buffer=buffer, background=background, grid=grid, ext=ext, sort=sort, reverse=reverse, colNA=colNA, alpha=alpha, box=box, clip=clip, leg_i=i, ...)
+			out <- .prep.vect.data(x, y[i], type=type, cols=col, mar=mar, plg=plg, pax=pax, legend=isTRUE(legend), add=add, axes=axes, main=main[i], buffer=buffer, background=background, grid=grid, zebra=zebra, ext=ext, sort=sort, reverse=reverse, colNA=colNA, alpha=alpha, box=box, clip=clip, leg_i=i, ...)
 
 			add_more(fun, i)
 
