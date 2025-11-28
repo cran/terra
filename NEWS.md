@@ -1,4 +1,34 @@
+# version 1.8-87
+
+## bug fixes
+
+- `writeVector` gave an error with an empty (0-row) SpatVector [#1960](https://github.com/rspatial/terra/pull/1960) by Andrew Gene Brown
+- terra did not compile with GEOS < 3.10 [#1961](https://github.com/rspatial/terra/issues/1961) by Wolfgang Viechtbauer
+- `intersect<SpatRaster,SpatRaster>` changed the extent of the second input SpatRaster if it did not match that of the first [#1964](https://github.com/rspatial/terra/issues/1964) by Greg Schmidt
+- `boundaries` with argument "classes=TRUE" ignored argument "inner=TRUE" (it was always FALSE). [#1963](https://github.com/rspatial/terra/issues/1963) by Oleg Zheleznyy
+- `cellFromXY` with NA coordinates returned 1 instead of NA on macOS [#1967](https://github.com/rspatial/terra/issues/1967) by John Baums
+- `stretch` crashed R with very large rasters [#1962](https://github.com/rspatial/terra/issues/1962) by Agustin Lobo
+- `focalReg` did not handle of custom functions with a weights argument [#1965](https://github.com/rspatial/terra/issues/1965) by Pedro Tarroso
+
+
+## enhancements
+
+- `boundaries` has new argument "ignoreNA=FALSE" to only detect boundaries between different classes, not between classes and missing values [#1963](https://github.com/rspatial/terra/issues/1963) by Oleg Zheleznyy
+- `stretch` gains argument "bylayer=TRUE" [#1970](https://github.com/rspatial/terra/issues/1970) by Michael Sumner
+- `makeValid` gains argument `buffer=FALSE` [#1955](https://github.com/rspatial/terra/issues/1955) by Márcia Barbosa
+- `plot<SpatVector>` argument "col" can now be a named vector or two-column matrix/data.frame to match character/factor values to colors [#1976](https://github.com/rspatial/terra/issues/1976) by Richard Cooper 
+
+## new
+
+- `fillHoles` method for SpatRaster
+- `chunk` method to run a non-memory-safe SpatRaster function in chunks
+- `centroids<SpatRaster>` method
+
+
 # version 1.8-80
+
+Released 2025-11-05
+
 
 ## bug fixes
 

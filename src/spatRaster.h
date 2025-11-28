@@ -621,6 +621,8 @@ class SpatRaster {
 		void collapse();
 		
 		SpatRaster rectify(std::string method, SpatRaster aoi, unsigned useaoi, bool snap, SpatOptions &opt);
+
+		std::vector<double> centroid(bool weights, SpatOptions &opt);
 		
         std::vector<double> adjacent(std::vector<double> cells, std::string directions, bool include);
         std::vector<double> adjacentMat(std::vector<double> cells, std::vector<bool> mat, std::vector<size_t> dim, bool include);
@@ -702,7 +704,7 @@ class SpatRaster {
 		SpatRaster patches(size_t directions, SpatOptions &opt);
 
 
-		SpatRaster edges(bool classes, std::string type, unsigned directions, double falseval, SpatOptions &opt);
+		SpatRaster edges(bool classes, bool internal, std::string type, unsigned directions, double falseval, SpatOptions &opt);
 		SpatRaster extend(SpatExtent e, std::string snap, double fill, SpatOptions &opt);
 		std::vector<std::vector<std::vector<double>>> extractVector(SpatVector v, bool touches, bool small, std::string method, bool cells, bool xy, bool weights, bool exact, SpatOptions &opt);
 		std::vector<double> extractVectorFlat(SpatVector v, std::vector<std::string> funs, bool narm, bool touches, bool small, std::string method, bool cells, bool xy, bool weights, bool exact, SpatOptions &opt);
@@ -802,7 +804,7 @@ class SpatRaster {
 
         std::vector<double> polygon_cells(SpatGeom& g);
 		SpatRaster quantile(std::vector<double> probs, bool narm, SpatOptions &opt);
-		SpatRaster stretch(std::vector<double> minv, std::vector<double> maxv, std::vector<double> minq, std::vector<double> maxq, std::vector<double> smin, std::vector<double> smax, SpatOptions &opt);
+		SpatRaster stretch(std::vector<double> minv, std::vector<double> maxv, std::vector<double> minq, std::vector<double> maxq, std::vector<double> smin, std::vector<double> smax, bool bylayer, double maxcell, SpatOptions &opt);
 		SpatRaster reverse(SpatOptions &opt);
 
 		SpatRaster range(std::vector<double> add, bool narm, SpatOptions &opt);
