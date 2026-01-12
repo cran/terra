@@ -367,6 +367,7 @@
 
 .plotit <- function(x) {
 
+
 	if (is.null(x$r)) {
 		x$values = FALSE
 	}
@@ -402,6 +403,7 @@
 	}
 	if (!x$legend_only) {
 		x <- .plot.axes(x)
+		reset.clip()
 		graphics::rasterImage(x$r, x$ext[1], x$ext[3], x$ext[2], x$ext[4], angle = 0, interpolate = x$interpolate)
 	}
 	
@@ -478,37 +480,13 @@
 	# backwards compatibility
 	reverse <- reverse | decreasing
 	out <- list()
-	e <- out$lim <- out$ext <- as.vector(ext(x))
+	out$lim <- out$ext <- as.vector(ext(x))
 	hadWin <- hasWin <- FALSE
 	if (add && is.null(ext)) {
 		ext <- unlist(get.clip())[1:4]
 	}
-	
-	if ((!is.null(ext)) || (!is.null(xlim)) || (!is.null(ylim))) {
-		if (!is.null(ext)) {
-			ext <- ext(ext)
-			#e <- as.vector(align(ext, x))
-			e <- as.vector(ext)
-			out$lim <- out$ext <- e
-		} 
-		if (!is.null(xlim)) {
-			stopifnot(length(xlim) == 2)
-			e[1:2] <- sort(xlim)
-		}
-		if (!is.null(ylim)) {
-			stopifnot(length(ylim) == 2)
-			e[3:4] <- sort(ylim)
-		}
-		out$lim <- e
-		
-		hasWin <- TRUE
-		hadWin <- window(x)
-		oldWin <- ext(x)
-		w <- intersect(ext(x), ext(e))		
-		window(x) <- out$ext <- w
-	} 
-	if (ncell(x) > 1.1 * maxcell) {
-			
+
+	if (ncell(x) > 1.1 * maxcell) {			
 		if (is.null(overview)) {	
 			if (grepl("https://", tolower(sources(x))[1])) {
 				overview <- TRUE
@@ -526,9 +504,28 @@
 		}
 #		x <- spatSample(x, maxcell, method="regular", as.raster=TRUE, warn=FALSE)
 		x <- sampleRaster(x, maxcell, method="regular", replace=FALSE, ext=NULL, warn=FALSE, overview=overview)
-
-		out$lim <- out$ext <- as.vector(ext(x))
 	}
+
+	if ((!is.null(ext)) || (!is.null(xlim)) || (!is.null(ylim))) {
+		if (!is.null(ext)) {
+			out$lim <- as.vector(ext)
+			out$ext <- as.vector(align(ext(ext), x, "out"))
+		} 
+		if (!is.null(xlim)) {
+			stopifnot(length(xlim) == 2)
+			out$lim[1:2] <- sort(xlim)
+		}
+		if (!is.null(ylim)) {
+			stopifnot(length(ylim) == 2)
+			out$lim[3:4] <- sort(ylim)
+		}
+		
+		hasWin <- TRUE
+		hadWin <- window(x)
+		oldWin <- ext(x)
+		w <- intersect(ext(x), ext(out$ext))		
+		window(x) <- out$ext <- w
+	} 
 	
 	if (buffer) {
 		dx <- diff(out$lim[1:2]) / 50

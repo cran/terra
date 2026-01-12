@@ -20,6 +20,16 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// proj_conf_test
+bool proj_conf_test();
+RcppExport SEXP _terra_proj_conf_test() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(proj_conf_test());
+    return rcpp_result_gen;
+END_RCPP
+}
 // proj_version
 std::string proj_version();
 RcppExport SEXP _terra_proj_version() {
@@ -309,23 +319,24 @@ BEGIN_RCPP
 END_RCPP
 }
 // set_proj_search_paths
-bool set_proj_search_paths(std::vector<std::string> paths);
-RcppExport SEXP _terra_set_proj_search_paths(SEXP pathsSEXP) {
+bool set_proj_search_paths(std::vector<std::string> paths, bool with_proj);
+RcppExport SEXP _terra_set_proj_search_paths(SEXP pathsSEXP, SEXP with_projSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< std::vector<std::string> >::type paths(pathsSEXP);
-    rcpp_result_gen = Rcpp::wrap(set_proj_search_paths(paths));
+    Rcpp::traits::input_parameter< bool >::type with_proj(with_projSEXP);
+    rcpp_result_gen = Rcpp::wrap(set_proj_search_paths(paths, with_proj));
     return rcpp_result_gen;
 END_RCPP
 }
 // PROJ_network
-std::string PROJ_network(bool enable, std::string url);
+std::string PROJ_network(int enable, std::string url);
 RcppExport SEXP _terra_PROJ_network(SEXP enableSEXP, SEXP urlSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< bool >::type enable(enableSEXP);
+    Rcpp::traits::input_parameter< int >::type enable(enableSEXP);
     Rcpp::traits::input_parameter< std::string >::type url(urlSEXP);
     rcpp_result_gen = Rcpp::wrap(PROJ_network(enable, url));
     return rcpp_result_gen;
@@ -443,6 +454,7 @@ RcppExport SEXP _rcpp_module_boot_spat();
 
 static const R_CallMethodDef CallEntries[] = {
     {"_terra_have_TBB", (DL_FUNC) &_terra_have_TBB, 0},
+    {"_terra_proj_conf_test", (DL_FUNC) &_terra_proj_conf_test, 0},
     {"_terra_proj_version", (DL_FUNC) &_terra_proj_version, 0},
     {"_terra_hex2rgb", (DL_FUNC) &_terra_hex2rgb, 1},
     {"_terra_rgb2hex", (DL_FUNC) &_terra_rgb2hex, 1},
@@ -469,7 +481,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_terra_setGDALCacheSizeMB", (DL_FUNC) &_terra_setGDALCacheSizeMB, 2},
     {"_terra_getGDALCacheSizeMB", (DL_FUNC) &_terra_getGDALCacheSizeMB, 1},
     {"_terra_get_proj_search_paths", (DL_FUNC) &_terra_get_proj_search_paths, 0},
-    {"_terra_set_proj_search_paths", (DL_FUNC) &_terra_set_proj_search_paths, 1},
+    {"_terra_set_proj_search_paths", (DL_FUNC) &_terra_set_proj_search_paths, 2},
     {"_terra_PROJ_network", (DL_FUNC) &_terra_PROJ_network, 2},
     {"_terra_removeDriver", (DL_FUNC) &_terra_removeDriver, 1},
     {"_terra_pearson_cor", (DL_FUNC) &_terra_pearson_cor, 3},

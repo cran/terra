@@ -1,4 +1,36 @@
+# version 1.8-93
+
+## bug fixes
+
+- `plot<SpatRaster>(add=TRUE)` did not put the legend in the right place if the first raster had a larger extent and the number of cells was larger than maxcell. [#1979](https://github.com/rspatial/terra/issues/1979) by Mehmet Göktuğ Öztürk
+- `plot<SpatVector>(ext=...)` plotted polygons outside plotting region if argument 'col' was used. [#1986](https://github.com/rspatial/terra/issues/1986) by Márcia Barbosa
+- `plot<SpatRaster>` with an "ext" argument could lead to misalignment as only entire cells were mapped. [#1989](https://github.com/rspatial/terra/issues/1989) by Márcia Barbosa
+- `distance<matrix,missing>` was not working [#1992](https://github.com/rspatial/terra/issues/1992) by Wencheng Lau-Medrano
+- `polys` ignored argument "border" [#1997](https://github.com/rspatial/terra/issues/1989) by Márcia Barbosa
+- `describe` works with linux paths starting with a tilde [2003](https://github.com/rspatial/terra/issues/2003) by David Moles
+- `zonal<SpatRaster,SpatRaster>` failed with arguments fun='sd', wide=F. [#2004](https://github.com/rspatial/terra/issues/2004) by Thomas Estabrook
+
+## enhancements
+
+- `vect<data.frame>` has improved guessing of variable names (if argument geom is not supplied) and crs (if that argument is not supplied, and gets argument "quiet=TRUE" that can be set to false to get warnings if either of these is guessed. [#1984](https://github.com/rspatial/terra/issues/1984) and [#1985](https://github.com/rspatial/terra/issues/1985) by Márcia Barbosa
+- `extract<SpatVector>` is now less memory hungry when using argument layers [#1983](https://github.com/rspatial/terra/issues/1983) by Kodi Arfer
+- `split<SpatVector>` now behaves like the data.frame method when using multiple split variables [#1987](https://github.com/rspatial/terra/issues/1987) by WillhKessler
+- `$<-<SpatVector>` now gives an error if the replacement is longer than the data, and a warning if recylcing of a shorter replacement is imperfect. [#1980](https://github.com/rspatial/terra/issues/1980) by Margaret Bolton
+- `cartogram` gets new arguments "inside" and "exp" and better scaling [#1982](https://github.com/rspatial/terra/issues/1982) by Márcia Barbosa
+- `spatSample<SpatRaster>` gains argument "as.mask" [#1981](https://github.com/rspatial/terra/issues/1981) by Agustin Lobo
+- `vect<character>` now handles MultiSurface geometries (as polygons) [#1994](https://github.com/rspatial/terra/issues/1994) by Márcia Barbosa
+- `plet<SpatVector>` and `polys<leaflet>` gain argument "lty" [#1997](https://github.com/rspatial/terra/issues/1989) by Márcia Barbosa
+
+
+## new
+
+- `proj_ok` helper function to check if the GDAL/PROJ install is functional [#1996](https://github.com/rspatial/terra/issues/1996) by Andrew Gene Brown
+- `nany<SpatRaster>` method (`!all` in one step) "nany" is short for "not any". This is used because "none" creates a conflict 
+
+
 # version 1.8-87
+
+Released 2025-11-28
 
 ## bug fixes
 
@@ -44,7 +76,7 @@ Released 2025-11-05
 ## enhancements
 
 - `plet<SpatRaster>` can (again) use a color function returned by `leaflet::colorNumeric` [#1904](https://github.com/rspatial/terra/issues/1904) by Ignacio Marzan
-- argument `animate<SpatRaster>` can now be set to `NA` to not get a shared legend [#1909](https://github.com/rspatial/terra/pull/1909) by Márcia Barbosa
+- `range` argument to `animate<SpatRaster>` can now be set to `NA` to not get a shared legend [#1909](https://github.com/rspatial/terra/pull/1909) by Márcia Barbosa
 - `text<SpatRaster>` and `text<SpatVector>` gained argument "jitter=0" [#1910](https://github.com/rspatial/terra/pull/1910) by Márcia Barbosa
 - `points<SpatVector>` gained argument "jitter=0"
 - `plet<SpatRaster>` gained arguments "range" and "fill_range" 
@@ -57,7 +89,7 @@ Released 2025-11-05
 ## new
 
 - `plet<SpatRasterCollection>` method
-- `cartogram<SpatRaster>` can now return a "circles" (dorling) cartogram [#1911](https://github.com/rspatial/terra/issues/1911) by Márcia Barbosa 
+- `cartogram<SpatRaster>` can now return a "circles" (Dorling) cartogram [#1911](https://github.com/rspatial/terra/issues/1911) by Márcia Barbosa 
 - `subset<SpatVector>` can now use a Spat object to spatially subset [#1937](https://github.com/rspatial/terra/issues/1937) by Márcia Barbosa
 - `plot<SpatRaster>` and `plot<SpatVector>` have new argument "zebra=FALSE", to create a zebra-box. [https://github.com/rspatial/terra/issues/1956](https://github.com/rspatial/terra/issues/1956) by Lucas Salinas Morales
 
@@ -308,7 +340,7 @@ Released 2025-01-13
 - using overviews for faster plotting of COGs over http [#1353](https://github.com/rspatial/terra/issues/1353) by Michael Sumner and [#1412](https://github.com/rspatial/terra/issues/1412); and argument `plot(x, overview=)` to change the default behavior. 
 - `extract` with points is now faster for rasters accessed over http [#1504](https://github.com/rspatial/terra/issues/1504) by Krzysztof Dyba
 - `extract` with many points on very large rasters was slower in compared to doing the same with "raster" (which uses terra for that!) [#1584](https://github.com/rspatial/terra/issues/1584) by Hassan Masoomi
-- `merge` now has three alternative algorithms [1366](https://github.com/rspatial/terra/issues/1366) by Hassan Masoomi and [#1650](https://github.com/rspatial/terra/issues/1650) by Agustin Lobo
+- `merge` now has three alternative algorithms [#1366](https://github.com/rspatial/terra/issues/1366) by Hassan Masoomi and [#1650](https://github.com/rspatial/terra/issues/1650) by Agustin Lobo
 
 
 ## new 
