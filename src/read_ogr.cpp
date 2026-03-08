@@ -845,7 +845,9 @@ bool SpatVector::read(std::string fname, std::string layer, std::string query, s
     }
 	bool success = read_ogr(poDS, layer, query, ext, filter, as_proxy, what, dialect);
 	if (poDS != NULL) GDALClose( poDS );
-	source = fname;
+	if (fname.substr(0, 1) != "{") { // not json
+		source = fname;
+	}
 	return success;
 }
 
@@ -861,6 +863,7 @@ SpatVector::SpatVector(std::vector<std::string> wkt) {
 
 	OGRGeometryFactory ogr;
 
+	extent.xmin = extent.xmax = extent.ymin = extent.ymax = NAN;
 	SpatGeom g;
 	bool haveGeomt = false;
 	SpatGeomType geomt = null;

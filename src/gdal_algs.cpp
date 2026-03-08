@@ -490,6 +490,12 @@ SpatRaster SpatRaster::warper(SpatRaster x, std::string crs, std::string method,
 	}
 
 
+	if (hasScaleOffset()) {
+		SpatOptions opt2(opt);
+		SpatRaster app = apply_so(opt2);	
+		return app.warper(x, crs, method, mask, align, resample, opt);
+	}
+
 	SpatRaster out = x.geometry(nlyr(), false, false);
 	if (!is_valid_warp_method(method)) {
 		out.setError("not a valid warp method");
@@ -606,19 +612,6 @@ SpatRaster SpatRaster::warper(SpatRaster x, std::string crs, std::string method,
 
 	std::string errmsg;
 	SpatExtent eout = out.getExtent();
-
-
-
-//	std::vector<bool> has_so = source[0].has_scale_offset;
-//	std::vector<double> scale = source[0].scale;
-//	std::vector<double> offset = source[0].offset;
-
-//	for (size_t i=1; i<ns; i++) {
-//		has_so.insert(has_so.end(), source[0].has_scale_offset.begin(), source[0].has_scale_offset.end());
-//		scale.insert(scale.end(), source[0].scale.begin(), source[0].scale.end());
-//		offset.insert(offset.end(), source[0].offset.begin(), source[0].offset.end());
-//	}
-
 
 	std::vector<bool> has_so(nlyr(), false);
 	std::vector<double> scale(nlyr(), 1);
@@ -1168,10 +1161,7 @@ SpatRaster SpatRaster::warper_by_util(SpatRaster x, std::string crs, std::string
 }
 
 
-
-
 #endif  // GDAL_VERSION_MAJOR <= 2 && GDAL_VERSION_MINOR < 2
-
 
 
 SpatRaster SpatRaster::resample(SpatRaster x, std::string method, bool mask, bool agg, SpatOptions &opt) {
@@ -1516,7 +1506,14 @@ SpatVector SpatRaster::polygonize(bool round, bool values, bool narm, bool aggre
 
 
 SpatRaster SpatRaster::rgb2col(size_t r,  size_t g, size_t b, SpatOptions &opt) {
+
 	SpatRaster out = geometry(1);
+
+	if (!hasValues()) {
+		out.setError("input raster has no values");
+		return out;
+	}	
+
 	if (nlyr() < 3) {
 		out.setError("need at least three layers");
 		return out;
@@ -1525,6 +1522,12 @@ SpatRaster SpatRaster::rgb2col(size_t r,  size_t g, size_t b, SpatOptions &opt) 
 	if (nlyr() < mxlyr) {
 		out.setError("layer number for R, G, B, cannot exceed nlyr()");
 		return out;
+	}
+	
+	if (hasScaleOffset()) {
+		SpatOptions opt2(opt);
+		SpatRaster app = apply_so(opt2);
+		app.rgb2col(r, g, b, opt);
 	}
 
 	std::vector<size_t> lyrs = {r, g, b};
@@ -1787,8 +1790,14 @@ SpatRaster SpatRaster::proximity(double target, double exclude, bool keepNA, std
 	if (!hasValues()) {
 		out.setError("input raster has no values");
 		return out;
+	}	
+
+	if (hasScaleOffset()) {
+		SpatOptions opt2(opt);
+		SpatRaster app = apply_so(opt2);
+		app.proximity(target, exclude, keepNA, unit, buffer, maxdist, remove_zero, opt);
 	}
-	
+
 	if (source[0].extset || source[0].flipped) { 
 		SpatOptions topt(opt);
 		SpatRaster etmp;
@@ -1951,6 +1960,13 @@ SpatRaster SpatRaster::sieveFilter(int threshold, int connections, SpatOptions &
 		out.setError("input raster has no values");
 		return out;
 	}
+
+	if (hasScaleOffset()) {
+		SpatOptions opt2(opt);
+		SpatRaster app = apply_so(opt2);	
+		return app.sieveFilter(threshold, connections, opt);
+	}
+	
 	if (!((connections == 4) || (connections == 8))) {
 		out.setError("connections should be 4 or 8");
 		return out;
@@ -2291,6 +2307,14 @@ SpatRaster SpatRaster::fillNA(double missing, double maxdist, int niter, SpatOpt
 		out.setError("input raster has no values");
 		return out;
 	}
+	
+	if (hasScaleOffset()) {
+		SpatOptions opt2(opt);
+		SpatRaster app = apply_so(opt2);	
+		return app.fillNA(missing, maxdist, niter, opt);
+	}
+	
+	
 	if (maxdist <= 0) {
 		out.setError("maxdist should be > 0");
 		return out;

@@ -265,7 +265,11 @@ setMethod("as.polygons", signature(x="SpatRaster"),
 )
 
 setMethod("as.lines", signature(x="SpatRaster"),
-	function(x) {
+	function(x, na.rm=FALSE) {
+		if (na.rm) {
+			p <- as.polygons(x[[1]], round=FALSE, aggregate=FALSE, values=FALSE, na.rm=TRUE) 
+			return(as.lines(p))
+		}
 		p <- methods::new("SpatVector")
 		opt <- spatOptions()
 		p@pntr <- x@pntr$as_lines(opt)
@@ -308,7 +312,7 @@ setMethod("as.lines", signature(x="SpatVector"),
 
 
 setMethod("as.lines", signature(x="matrix"),
-	function(x, crs="") {
+	function(x, crs="", segments=FALSE) {
 		p <- vect()
 		if (ncol(x) == 2) {
 			nr <- nrow(x)
@@ -319,7 +323,12 @@ setMethod("as.lines", signature(x="matrix"),
 		} else {
 			error("expecting a two or four column matrix", "as.lines")
 		}
-		messages(p, "vect")
+		if (segments) {
+			p <- messages(p, "vect")
+			disagg(p, segments=TRUE)
+		} else {
+			messages(p, "vect")
+		}
 	}
 )
 
@@ -594,6 +603,12 @@ setAs("sf", "SpatVector",
 		geom <- from[[sfi]]
 		if (inherits(geom, "list")) {
 			error("as,sf", "the geometry column is not valid (perhaps first load the sf package)")
+		}
+		if (inherits(geom, "sfc_POLYGON") && isTRUE(dim(geom[[1]][[1]] == c(2,2)))) {
+			if (geom[[1]][[1]] == matrix(c(0,0,-90,-90), ncol=2)) {
+				# sf "POLYGON FULL"
+				return(as.polygons(ext(from), crs="lonlat"))
+			}
 		}
 		v <- try(.from_sf(from, geom, sfi), silent=FALSE)
 		if (inherits(v, "try-error")) {

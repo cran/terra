@@ -67,6 +67,8 @@ void SpatRaster::gdalogrproj_init(std::string path) {
 
 }
 
+
+
 /*
 bool GetTime(std::string filename, std::vector<int64_t> &time, std::string &timestep, size_t nl) {
 	filename += ".time";
@@ -93,6 +95,21 @@ bool GetUnits(std::string filename, std::vector<std::string> &units, size_t nl) 
 	return true;
 }
 */
+
+bool ncdf_good_ends(std::string const &s) {
+	std::vector<std::string> end = {"_bnds", "_bounds", "lat", "lon", "longitude", "latitude"};
+	for (size_t i=0; i<end.size(); i++) {
+		if (s.length() >= end[i].length()) {
+			if (s.compare(s.length() - end[i].length(), s.length(), end[i]) == 0) {
+				return false;
+			}
+		}
+	}
+	if (s == "x" || s == "y" || s == "northing" || s == "easting") {
+		return false;
+	}
+	return true;
+}
 
 bool read_aux_json(std::string filename, std::vector<int64_t> &time, std::string &timestep, std::vector<std::string> &units, size_t nlyr) {
 	filename += ".aux.json";
@@ -170,7 +187,7 @@ bool GetRAT(GDALRasterAttributeTable *pRAT, SpatCategories &cats, const std::str
 	size_t nc = (int) pRAT->GetColumnCount();
 	size_t nr = (int) pRAT->GetRowCount();
 
-	std::vector<std::string> ss = {"histogram", "count", "red", "green", "blue", "alpha", "opacity", "r", "g", "b", "a"};
+	std::vector<std::string> ss = {"histogram", "count", "pixel count", "red", "green", "blue", "alpha", "opacity", "r", "g", "b", "a"};
 
 	std::vector<std::string> ratnms;
 	std::vector<int> id, id2;
@@ -623,7 +640,7 @@ std::vector<std::string> get_metadata(std::string filename, std::vector<std::str
     if( poDataset == NULL )  {
 		return metadata;
 	}
-	char **m = poDataset->GetMetadata();
+	CSLConstList m = poDataset->GetMetadata();
 	if (m) {
 		while (*m != nullptr) {
 			metadata.push_back(*m++);
@@ -647,7 +664,7 @@ SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool u
 	}
 
 	std::string delim = "NAME=";
-	char **metadata = poDataset->GetMetadata("SUBDATASETS");
+	CSLConstList metadata = poDataset->GetMetadata("SUBDATASETS");
 
 	if (metadata == NULL) {
 		GDALClose( (GDALDatasetH) poDataset );
@@ -679,23 +696,25 @@ SpatRasterStack::SpatRasterStack(std::string fname, std::vector<int> ids, bool u
 				continue;
 			}
 			std::string s = meta[ids[i]*2];
-			size_t pos = s.find(delim);
-			if (pos != std::string::npos) {
-				s.erase(0, pos + delim.length());
-				SpatRaster sub;
-				if (sub.constructFromFile(s, {-1}, {""}, {}, options, false, guessCRS, domains)) {
-					std::string sname = sub.source[0].source_name.empty() ? basename_sds(s) : sub.source[0].source_name;
-					if (!push_back(sub, sname, sub.source[0].source_name_long, sub.source[0].unit[0], true)) {
-						addWarning("skipped (different geometry): " + s);
+			if (ncdf_good_ends(s)) {
+				size_t pos = s.find(delim);
+				if (pos != std::string::npos) {
+					s.erase(0, pos + delim.length());
+					SpatRaster sub;
+					if (sub.constructFromFile(s, {-1}, {""}, {}, options, false, guessCRS, domains)) {
+						std::string sname = sub.source[0].source_name.empty() ? basename_sds(s) : sub.source[0].source_name;
+						if (!push_back(sub, sname, sub.source[0].source_name_long, sub.source[0].unit[0], true)) {
+							addWarning("skipped (different geometry): " + s);
+						}
+					} else {
+						addWarning("skipped (fail): " + s);
 					}
-				} else {
-					addWarning("skipped (fail): " + s);
 				}
 			}
 		}
 	}
 	meta.resize(0);
-	char **m = poDataset->GetMetadata();
+	CSLConstList m = poDataset->GetMetadata();
 	if (m) {
 		while (*m != nullptr) {
 			meta.push_back(*m++);
@@ -725,7 +744,7 @@ SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> i
 	}
 
 	std::string delim = "NAME=";
-	char **metadata = poDataset->GetMetadata("SUBDATASETS");
+	CSLConstList metadata = poDataset->GetMetadata("SUBDATASETS");
 
 	if (metadata == NULL) {
 		GDALClose( (GDALDatasetH) poDataset );
@@ -770,7 +789,7 @@ SpatRasterCollection::SpatRasterCollection(std::string fname, std::vector<int> i
 		}
 	}
 	meta.resize(0);
-	char **m = poDataset->GetMetadata();
+	CSLConstList m = poDataset->GetMetadata();
 	if (m) {
 		while (*m != nullptr) {
 			meta.push_back(*m++);
@@ -886,7 +905,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 	int nl = poDataset->GetRasterCount();
 	std::string gdrv = poDataset->GetDriver()->GetDescription();
 
-	char **metasds = poDataset->GetMetadata("SUBDATASETS");
+	CSLConstList metasds = poDataset->GetMetadata("SUBDATASETS");
 	
 	if (metasds != NULL) {
 		std::vector<std::string> meta;
@@ -902,7 +921,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 	}
 
 	for (size_t i=0; i<domains.size(); i++) {
-		char **meterra = poDataset->GetMetadata(domains[i].c_str());
+	  CSLConstList meterra = poDataset->GetMetadata(domains[i].c_str());
 		if (meterra != NULL) {
 			std::vector<std::string> meta;
 			for (size_t j=0; meterra[j] != NULL; j++) {
@@ -919,7 +938,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 	
 	SpatRasterSource s;
 
-	char **metasrc = poDataset->GetMetadata();
+	CSLConstList metasrc = poDataset->GetMetadata();
 	while (metasrc != nullptr && *metasrc != nullptr) {
 		s.smdata.push_back(*metasrc++);
 	}
@@ -1065,7 +1084,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 		}
 
 		// if ((gdrv=="netCDF") || (gdrv == "HDF5") || (gdrv == "GRIB") || (gdrv == "GTiff")) {
-			char **m = poBand->GetMetadata();
+		  CSLConstList m = poBand->GetMetadata();
 			while (m != nullptr && *m != nullptr) {
 				bandmeta[i].push_back(*m++);
 			}
@@ -1073,7 +1092,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 			//	Rcpp::Rcout << bandmeta[i][j] << std::endl;
 			//}
 			
-			char **meterra = poBand->GetMetadata("USER_TAGS");
+			CSLConstList meterra = poBand->GetMetadata("USER_TAGS");
 			if (meterra != NULL) {
 //				std::vector<std::string> meta;
 				for (size_t j=0; meterra[j] != NULL; j++) {
@@ -1302,7 +1321,7 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 
 	if ((gdrv=="netCDF") || (gdrv == "HDF5"))  {
 		
-		char **m = poDataset->GetMetadata();
+		CSLConstList m = poDataset->GetMetadata();
 		if (m) {
 			while (*m != nullptr) {
 				metadata.push_back(*m++);
@@ -1988,20 +2007,6 @@ std::vector<double> SpatRaster::readRowColGDALFlat(size_t src, std::vector<int64
 
 // ncdf
 
-bool ncdf_good_ends(std::string const &s) {
-	std::vector<std::string> end = {"_bnds", "_bounds", "lat", "lon", "longitude", "latitude"};
-	for (size_t i=0; i<end.size(); i++) {
-		if (s.length() >= end[i].length()) {
-			if (s.compare(s.length() - end[i].length(), s.length(), end[i]) == 0) {
-				return false;
-			}
-		}
-	}
-	if (s == "x" || s == "y" || s == "northing" || s == "easting") {
-		return false;
-	}
-	return true;
-}
 
 void ncdf_pick_most(std::vector<std::string> &sd, std::vector<std::string> &varname, std::vector<std::string> &longname, std::vector<int> &dim1, std::vector<int> &dim2) {
 	if (sd.size() < 2) return;
@@ -2082,7 +2087,7 @@ bool SpatRaster::constructFromSDS(std::string filename, std::vector<std::string>
 	} else {
 		// eliminate sources based on names like "*_bnds" and "lat"
 		std::vector<int> rows, cols;
-		for (size_t i=0; i<info[1].size(); i++) {			
+		for (size_t i=0; i<info[1].size(); i++) {
 			if (ncdf_good_ends(info[1][i])) {
 				sd.push_back(info[0][i]);
 				varname.push_back(info[1][i]);

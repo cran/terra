@@ -640,6 +640,8 @@ class SpatRaster {
 		SpatRaster arith(std::vector<double> x, std::string oper, bool reverse, bool falseNA, SpatOptions &opt);
 		SpatRaster arith_m(std::vector<double> x, std::string oper, std::vector<size_t> dim, bool reverse, SpatOptions &opt);
 
+		SpatRaster apply_so(SpatOptions &opt);
+
 		SpatRaster apply(std::vector<size_t> ind, std::string fun, bool narm, std::vector<std::string> nms, std::vector<int64_t> time, std::string timestep, std::string timezone, SpatOptions &opt);
 	
 		SpatRaster rapply(SpatRaster x, double first, double last, std::string fun, bool clamp, bool narm, bool circular, SpatOptions &opt);
@@ -829,6 +831,10 @@ class SpatRaster {
 
 
 		SpatRaster replaceValues(std::vector<double> from, std::vector<double> to, long nl, bool setothers, double others, bool keepcats, SpatOptions &opt);
+		SpatRaster lookup_apply(std::vector<double> from_vals, std::vector<double> to_vals, bool others, double othersValue, SpatOptions &opt);
+		SpatRaster lookup_classify(std::vector<double> from_vals, std::vector<double> to_vals, bool others, double othersValue, SpatOptions &opt);
+		SpatRaster lookup_subst(std::vector<double> from_vals, std::vector<double> to_vals, bool others, double othersValue, SpatOptions &opt);
+		SpatRaster lookup_catalyze(std::vector<double> from_vals, std::vector<std::vector<double>> to_vals_list, SpatOptions &opt);
 		SpatRaster reclassify(std::vector<std::vector<double>> rcl, unsigned openclosed, bool lowest, bool others, double othersValue, bool bylayer, bool brackets, bool keepcats, SpatOptions &opt);
 		SpatRaster reclassify(std::vector<double> rcl, size_t nc, unsigned openclosed, bool lowest, bool others, double othersValue, bool bylayer, bool brackets, bool keepcats, SpatOptions &opt);
 		//SpatRaster classify_layers(std::vector<std::vector<double>> groups, std::vector<double> id, SpatOptions &opt);
@@ -881,7 +887,9 @@ class SpatRaster {
 		SpatRaster trig(std::string fun, SpatOptions &opt);
 		SpatRaster trim1(double value, size_t padding, SpatOptions &opt);
 		SpatRaster trim2(double value, size_t padding, SpatOptions &opt);
-		std::vector<std::vector<double>> unique(bool bylayer, double digits, bool narm, SpatOptions &opt);
+		            std::vector<std::vector<double>> unique(bool bylayer, double digits, bool narm, SpatOptions &opt);
+		            std::vector<double> crosstab(int digits, bool narm, SpatOptions &opt);
+
 		SpatRaster project1(std::string newcrs, std::string method, SpatOptions &opt);
 		SpatRaster project2(SpatRaster &x, std::string method, SpatOptions &opt);
 		void project3(SpatRaster &out, std::string method, SpatOptions &opt);

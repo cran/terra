@@ -127,4 +127,3 @@ aggregate(de[,2:4], de[,1,drop=FALSE], mean)
 
 \keyword{methods}
 \keyword{spatial}
-

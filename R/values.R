@@ -9,6 +9,10 @@ setMethod("hasValues", signature(x="SpatRaster"),
 	}
 )
 
+ok_int <- function(x) {
+	r <- suppressWarnings(range(x, na.rm=TRUE))
+	isTRUE((r[1] >= -.Machine$integer.max) && (r[2] <= .Machine$integer.max))
+}
 
 .makeDataFrame <- function(x, v, ...) {
 
@@ -36,10 +40,12 @@ setMethod("hasValues", signature(x="SpatRaster"),
 			v[[b]] = as.logical(v[[b]])
 		}
 	}
-	ii <- (is.int(x) & (!ff) & (substr(datatype(x, TRUE), 1, 4) != "INT8"))
+	ii <- (is.int(x) & (!ff))
 	if (any(ii)) {
 		for (i in which(ii)) {
-			v[[i]] = as.integer(v[[i]])
+			if (ok_int(v[[i]])) {
+				v[[i]] = as.integer(v[[i]])
+			}
 		}
 	}
 	dd <- !(bb | ii | ff)
@@ -63,7 +69,11 @@ function(x, row=1, nrows=nrow(x), col=1, ncols=ncol(x), mat=FALSE, dataframe=FAL
 		return(.makeDataFrame(x, v, ...) )
 	} else if (mat) {
 		if (all(is.int(x))) {
-			v <- matrix(as.integer(v), ncol = nlyr(x))
+			if (ok_int(v)) {
+				v <- matrix(as.integer(v), ncol = nlyr(x))
+			} else {
+				v <- matrix(v, ncol = nlyr(x))				
+			}
 		} else if (all(is.bool(x))) {
 			v <- matrix(as.logical(v), ncol = nlyr(x))		
 		} else {
@@ -71,7 +81,9 @@ function(x, row=1, nrows=nrow(x), col=1, ncols=ncol(x), mat=FALSE, dataframe=FAL
 		}
 		colnames(v) <- names(x)
 	} else if (all(is.int(x))) {
-		v <- as.integer(v)
+		if (ok_int(v)) {
+			v <- as.integer(v)
+		}
 	} else if (all(is.bool(x))) {
 		v <- as.logical(v)
 	}
