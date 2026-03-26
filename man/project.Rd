@@ -100,6 +100,7 @@ The output resolution should generally be similar to the input resolution, but t
 
 \examples{
 ## SpatRaster
+\dontrun{
 a <- rast(ncols=40, nrows=40, xmin=-110, xmax=-90, ymin=40, ymax=60, 
           crs="+proj=longlat +datum=WGS84")
 values(a) <- 1:ncell(a)
@@ -115,9 +116,8 @@ crs(v, proj=TRUE)
 cat(crs(v), "\n")
 
 project(v, "+proj=moll")
-
-
 project(v, "EPSG:2169")
+}
 }
 
 \keyword{spatial}

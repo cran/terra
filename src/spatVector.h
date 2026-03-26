@@ -125,6 +125,7 @@ class SpatVector {
 		SpatVector(SpatExtent e, std::string crs);
 		SpatVector(std::vector<double> x, std::vector<double> y, SpatGeomType g, std::string crs);
 		SpatVector(std::vector<std::string> wkt);
+		std::vector<std::string> getGeometryWKT();	
 		virtual ~SpatVector(){}
 
 		SpatGeom window; // for point patterns, must be polygon
@@ -168,7 +169,7 @@ class SpatVector {
 		bool replaceGeom(SpatGeom p, size_t i);
 		std::vector<std::vector<double>> getGeometry();
 		SpatDataFrame getGeometryDF();
-		std::vector<std::string> getGeometryWKT();
+//		std::vector<std::string> getGeometryWKT();
 		void computeExtent();
 
 		bool addRawGeoms(std::vector<unsigned char*> wkbs, std::vector<size_t> sizes);
