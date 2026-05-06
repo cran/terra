@@ -401,4 +401,39 @@ same.crs <- function(x, y) {
 }
 
 
+proj_pipelines <- function(from, to, authority="", AOI=NULL, use="NONE", grid_availability="USED",
+		desired_accuracy=-1.0, strict_containment=FALSE) {
+
+	if (!is.character(from)) {
+		from <- crs(from)
+	}
+	if (!is.character(to)) {
+		to <- crs(to)
+	}
+	if (is.na(from) || from == "") {
+		error("proj_pipelines", "from is empty or NA")
+	}
+	if (is.na(to) || to == "") {
+		error("proj_pipelines", "to is empty or NA")
+	}
+	if (is.null(AOI)) {
+		AOI <- numeric(0)
+	} else {
+		AOI <- try(ext(AOI), silent=TRUE)
+		if (inherits(AOI, "try-error")) {
+			error("project", "AOI must be or have a SpatExtent")
+		}
+		AOI <- as.vector(AOI)[c(1,3,2,4)]
+	}
+	
+	out <- .proj_pipelines(from, to, authority, as.numeric(AOI), as.character(use),
+		grid_availability, desired_accuracy, isTRUE(strict_containment), FALSE)
+
+	out <- data.frame(out)
+	attr(out, "from") <- from
+	attr(out, "to") <- to
+	
+	out
+}
+
 

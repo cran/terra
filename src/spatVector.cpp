@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2025 :: Robert J. Hijmans
+// Copyright (c) 2018-2026 :: Robert J. Hijmans
 //
 // This file is part of the "spat" library.
 //
@@ -12,7 +12,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have received a copy of the GNU General Public LicenseT
 // along with spat. If not, see <http://www.gnu.org/licenses/>.
 
 #include "spatVector.h"
@@ -201,10 +201,10 @@ void SpatGeom::computeExtent() {
 	extent.ymin = *std::min_element(parts[0].y.begin(), parts[0].y.end());
 	extent.ymax = *std::max_element(parts[0].y.begin(), parts[0].y.end());
 	for (size_t i=1; i<parts.size(); i++) {
-		extent.xmin = std::min(extent.xmin, *std::min_element(parts[0].x.begin(), parts[0].x.end()));
-		extent.xmax = std::max(extent.xmin, *std::max_element(parts[0].x.begin(), parts[0].x.end()));
-		extent.ymin = std::min(extent.xmin, *std::min_element(parts[0].y.begin(), parts[0].y.end()));
-		extent.ymax = std::max(extent.xmin, *std::max_element(parts[0].y.begin(), parts[0].y.end()));
+		extent.xmin = std::min(extent.xmin, *std::min_element(parts[i].x.begin(), parts[i].x.end()));
+		extent.xmax = std::max(extent.xmax, *std::max_element(parts[i].x.begin(), parts[i].x.end()));
+		extent.ymin = std::min(extent.ymin, *std::min_element(parts[i].y.begin(), parts[i].y.end()));
+		extent.ymax = std::max(extent.ymax, *std::max_element(parts[i].y.begin(), parts[i].y.end()));
 	}
 }
 
@@ -537,6 +537,23 @@ size_t SpatVector::nparts(bool holes) {
 		}
 	}
 	return totnp;
+}
+
+size_t SpatVector::nnodes(bool holes) {
+	size_t totn = 0;
+	size_t ng = geoms.size();
+	for (size_t i=0; i<ng; i++) {
+		size_t np = geoms[i].parts.size();
+		for (size_t j=0; j<np; j++) {
+			totn += geoms[i].parts[j].x.size();
+			if (holes) {
+				for (size_t k=0; k<geoms[i].parts[j].nHoles(); k++) {
+					totn += geoms[i].parts[j].holes[k].x.size();
+				}
+			}
+		}
+	}
+	return totn;
 }
 
 

@@ -1,3 +1,20 @@
+// Copyright (c) 2018-2026  Robert J. Hijmans
+//
+// This file is part of the "spat" library.
+//
+// spat is free software: you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
+// (at your option) any later version.
+//
+// spat is distributed in the hope that it will be useful, but
+// WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with spat. If not, see <http://www.gnu.org/licenses/>.
+
 #include <unordered_map>
 
 #include "ogr_spatialref.h"
@@ -279,7 +296,7 @@ std::vector<std::vector<std::string>> sdinfo(std::string fname) {
 			name.push_back(s);
 			std::string vdelim = ":";
 			size_t pos = s.find_last_of(vdelim);
-			if (sub.constructFromFile(s, {-1}, {""}, {}, {}, false, false, {})) {
+			if (sub.constructFromFile(s, {-1}, {""}, {}, {}, {}, false, false, {}, 0)) {
 				nr.push_back(std::to_string(sub.nrow()));
 				nc.push_back(std::to_string(sub.ncol()));
 				nl.push_back(std::to_string(sub.nlyr()));
@@ -843,7 +860,7 @@ bool SpatRaster::from_gdalMEM(GDALDatasetH hDS, bool set_geometry, bool get_valu
 
 
 
-char ** set_GDAL_options(std::string driver, double diskNeeded, bool writeRGB, std::vector<std::string> gdal_options) {
+char ** set_GDAL_options(std::string driver, double diskNeeded, bool writeRGB, bool parallel, std::vector<std::string> gdal_options) {
 
 	char ** gdalops = NULL;
 	if (driver == "GTiff") {
@@ -871,6 +888,18 @@ char ** set_GDAL_options(std::string driver, double diskNeeded, bool writeRGB, s
 			}
 			if (big) {
 				gdalops = CSLSetNameValue( gdalops, "BIGTIFF", "YES");
+			}
+		}
+		if (compressed && parallel) {
+			bool numt = true;
+			for (size_t i=0; i<gdal_options.size(); i++) {
+				if (gdal_options[i].substr(0, 10) == "NUM_THREADS") {
+					numt = false;
+					break;
+				}
+			}
+			if (numt) {
+				gdalops = CSLSetNameValue( gdalops, "NUM_THREADS", "ALL_CPUS");				
 			}
 		}
 		if (writeRGB) {
@@ -916,7 +945,7 @@ bool SpatRaster::create_gdalDS(GDALDatasetH &hDS, std::string filename, std::str
 			return(false);
 		}
 
-		papszOptions = set_GDAL_options(driver, diskNeeded, false, opt.gdal_options);
+		papszOptions = set_GDAL_options(driver, diskNeeded, false, opt.parallel, opt.gdal_options);
 
 		if (datatype == "INT4S") {
 			naflag = INT32_MIN; //-2147483648;

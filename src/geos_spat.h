@@ -99,7 +99,7 @@ inline void warnNoCall(const char* fmt, Args&&... args ) {
 }
 
 template <typename... Args>
-inline void NORET errNoCall(const char* fmt, Args&&... args) {
+NORET inline void errNoCall(const char* fmt, Args&&... args) {
     throw Rcpp::exception(tfm::format(fmt, std::forward<Args>(args)... ).c_str(), false);
 }
 
@@ -158,7 +158,6 @@ inline GEOSContextHandle_t geos_init(void) {
 
 #else 
 
-#include <iostream>
 static void __errorHandler(const char *fmt, ...) { 
 	char buf[BUFSIZ], *p;
 	va_list ap;
@@ -169,7 +168,7 @@ static void __errorHandler(const char *fmt, ...) {
 	va_end(ap);
 	p = buf + strlen(buf) - 1;
 	if(strlen(buf) > 0 && *p == '\n') *p = '\0';
-    std::cout << buf << std::endl; 
+	(void)buf;
 	return; 
 } 
 
@@ -183,7 +182,7 @@ static void __warningHandler(const char *fmt, ...) {
 	va_end(ap);
 	p = buf + strlen(buf) - 1;
 	if(strlen(buf) > 0 && *p == '\n') *p = '\0';
-    std::cout << buf << std::endl; 
+	(void)buf;
 	return;
 }
 
@@ -447,8 +446,6 @@ inline SpatVector vect_from_geos(std::vector<GeomPtr> &geoms , GEOSContextHandle
 				if (npts < 0) {
 #ifdef useRcpp
 					Rcpp::Rcout << "exception 99" << std::endl;
-#else
-					std::cout <<  "exception 66" << std::endl;
 #endif
 					continue;
 				}
@@ -476,8 +473,6 @@ inline SpatVector vect_from_geos(std::vector<GeomPtr> &geoms , GEOSContextHandle
 
 #ifdef useRcpp
 						Rcpp::Rcout << "exception 909" << std::endl;
-#else 
-						std::cout << "exception 606" << std::endl; 
 #endif
 						continue;
 					}

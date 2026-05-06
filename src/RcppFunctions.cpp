@@ -1,7 +1,9 @@
 #include <Rcpp.h>
 #include "spatRasterMultiple.h"
+#include "crs.h"
 #include "string_utils.h"
 #include "math_utils.h"
+#include "file_utils.h"
 
 #include "sort.h"
 
@@ -9,12 +11,13 @@
 #include "gdalio.h"
 #include "ogr_spatialref.h"
 
+#include <unordered_map>
+#include <string>
+
 //#define GEOS_USE_ONLY_R_API
 #include <geos_c.h>
 
-#if defined(HAVE_TBB) && !defined(__APPLE__)
-#define USE_TBB
-#endif
+#include "tbb_helper.h"
 
 
 #if GDAL_VERSION_MAJOR >= 3
@@ -49,6 +52,14 @@ bool have_TBB() {
 	#else 
 		return false;
 	#endif 
+}
+
+
+// [[Rcpp::export(name = ".open_file_limit")]]
+std::vector<size_t> open_file_lim() {
+	size_t nopen, soft, hard;
+	open_file_limit(nopen, soft, hard);
+	return {nopen, soft, hard};
 }
 
 
@@ -325,8 +336,33 @@ inline void warningNoCall(const char* fmt, Args&&... args ) {
 }
 
 template <typename... Args>
-inline void NORET stopNoCall(const char* fmt, Args&&... args) {
+NORET inline void stopNoCall(const char* fmt, Args&&... args) {
     throw Rcpp::exception(tfm::format(fmt, std::forward<Args>(args)... ).c_str(), false);
+}
+
+static int proj_cdn_suppressed = 0;
+static std::string proj_cdn_reason;
+
+static bool is_proj_cdn_warning(const char *msg) {
+	std::string s(msg);
+	return (s.find("cdn.proj.org") != std::string::npos ||
+	        (s.find("PROJ:") != std::string::npos &&
+	         s.find("Cannot open https://") != std::string::npos));
+}
+
+static bool handle_proj_cdn(const char *msg, int err_no) {
+	if (!is_proj_cdn_warning(msg)) return false;
+	proj_cdn_suppressed++;
+	if (proj_cdn_suppressed == 1) {
+		std::string s(msg);
+		auto pos = s.rfind(": ");
+		if (pos != std::string::npos && pos > 30) {
+			proj_cdn_reason = s.substr(pos + 2);
+		} else {
+			proj_cdn_reason = s;
+		}
+	}
+	return true;
 }
 
 static void __err_warning(CPLErr eErrClass, int err_no, const char *msg) {
@@ -335,16 +371,22 @@ static void __err_warning(CPLErr eErrClass, int err_no, const char *msg) {
             break;
         case 1:
         case 2:
-            warningNoCall("%s (GDAL %d)", msg, err_no);
+            if (!handle_proj_cdn(msg, err_no)) {
+                warningNoCall("%s (GDAL %d)", msg, err_no);
+            }
             break;
         case 3:
-            warningNoCall("%s (GDAL error %d)", msg, err_no);
+            if (!handle_proj_cdn(msg, err_no)) {
+                warningNoCall("%s (GDAL error %d)", msg, err_no);
+            }
             break;
         case 4:
             stopNoCall("%s (GDAL unrecoverable error %d)", msg, err_no);
             break;
         default:
-            warningNoCall("%s (GDAL error class %d, #%d)", msg, eErrClass, err_no);
+            if (!handle_proj_cdn(msg, err_no)) {
+                warningNoCall("%s (GDAL error class %d, #%d)", msg, eErrClass, err_no);
+            }
             break;
     }
     return;
@@ -357,7 +399,9 @@ static void __err_error(CPLErr eErrClass, int err_no, const char *msg) {
         case 2:
             break;
         case 3:
-            warningNoCall("%s (GDAL error %d)", msg, err_no);
+            if (!handle_proj_cdn(msg, err_no)) {
+                warningNoCall("%s (GDAL error %d)", msg, err_no);
+            }
             break;
         case 4:
             stopNoCall("%s (GDAL unrecoverable error %d)", msg, err_no);
@@ -405,9 +449,18 @@ void set_gdal_warnings(int level) {
 	}
 }
 
-#include "common.h"
+// [[Rcpp::export(name = ".proj_cdn_suppressed")]]
+Rcpp::List get_proj_cdn_suppressed() {
+	Rcpp::List out = Rcpp::List::create(
+		Rcpp::Named("count") = proj_cdn_suppressed,
+		Rcpp::Named("reason") = proj_cdn_reason
+	);
+	proj_cdn_suppressed = 0;
+	proj_cdn_reason = "";
+	return out;
+}
 
-std::mt19937 my_rgen;
+#include "common.h"
 
 // [[Rcpp::export(name = ".seedinit")]]
 void seed_init(uint32_t seed_val) {
@@ -620,6 +673,39 @@ std::string PROJ_network(int enable, std::string url) {
 	return s;
 }
 
+
+
+// [[Rcpp::export(name = ".proj_pipelines")]]
+Rcpp::List proj_pipelines(std::string source_crs, std::string target_crs,
+		std::string authority, std::vector<double> AOI, std::string use,
+		std::string grid_availability, double desired_accuracy,
+		bool strict_containment, bool axis_order_authority_compliant) {
+
+	SpatDataFrame df = get_proj_pipelines(source_crs, target_crs, authority, AOI, use, 
+		grid_availability, desired_accuracy, strict_containment, axis_order_authority_compliant);
+	if (df.hasError()) {
+		Rcpp::stop(df.getError());
+	}
+	Rcpp::List out(df.ncol());
+	for (size_t i = 0; i < df.ncol(); i++) {
+		if (df.itype[i] == 0) {
+			out[i] = df.getD(i);
+		} else if (df.itype[i] == 1) {
+			out[i] = Rcpp::wrap(df.getI(i));
+		} else if (df.itype[i] == 2) {
+			out[i] = Rcpp::wrap(df.getS(i));
+		} else if (df.itype[i] == 3) {
+			std::vector<int8_t> b = df.getB(i);
+			Rcpp::LogicalVector lv(b.size());
+			for (size_t j = 0; j < b.size(); j++) {
+				lv[j] = (b[j] > 1) ? NA_LOGICAL : (int) b[j];
+			}
+			out[i] = lv;
+		}
+	}
+	out.names() = df.names;
+	return out;
+}
 
 
 // [[Rcpp::export(name = ".removeDriver")]]

@@ -136,6 +136,8 @@ class SpatVector {
 		size_t ncol();
 		size_t nxy();
 
+		std::string show();
+
 		SpatVector deepCopy() {return *this;}
 
 		SpatExtent getExtent();
@@ -175,11 +177,14 @@ class SpatVector {
 		bool addRawGeoms(std::vector<unsigned char*> wkbs, std::vector<size_t> sizes);
 
 		size_t nparts(bool holes);
+		size_t nnodes(bool holes);
 
 		size_t ncoords();
 		std::vector<std::vector<double>> coordinates();
 
-		SpatVector project(std::string crs, bool partial);
+		SpatVector project(std::string crs, bool partial, std::string pipeline="",
+			std::vector<double> AOI=std::vector<double>(), double desired_accuracy=-1.0,
+			bool allow_ballpark=true);
 		std::vector<double> project_xy(std::vector<double> x, std::vector<double> y, std::string fromCRS, std::string toCRS);
 
 		SpatVector subset_cols(long i);
@@ -202,6 +207,7 @@ class SpatVector {
 
 		std::vector<double> distance(bool sequential, std::string unit, const std::string method, bool by_node, SpatOptions &opt);
 		std::vector<double> distance(SpatVector x, bool pairwise, std::string unit, const std::string method, bool by_node, SpatOptions &opt);
+		SpatVector thin_geoms(double d, std::string unit, SpatOptions &opt);
 		std::vector<double> pointdistance(const std::vector<double>& px, const std::vector<double>& py, const std::vector<double>& sx, const std::vector<double>& sy, bool pairwise, double m, bool lonlat, std::string method);
 
 //		std::vector<double> pointdistance_seq(const std::vector<double>& px, const std::vector<double>& py, double m, bool lonlat);
@@ -334,7 +340,7 @@ class SpatVector {
 		SpatVector shared_paths(SpatVector x, bool index);
 		SpatVector snap(double tolerance);
 		SpatVector snapto(SpatVector y, double tolerance);
-		SpatVector thin(double threshold);
+		SpatVector thin_nodes(double threshold);
 		SpatVector split_lines(SpatVector v);
 		SpatVector allerretour();
 		SpatVectorCollection bienvenue();
@@ -355,9 +361,16 @@ class SpatVector {
 		SpatVector centroid(bool check_lonlat);
 		SpatVector point_on_surface(bool check_lonlat);
 		std::vector<int> pointInPolygon(std::vector<double> &x, std::vector<double> &y);
+		std::vector<int> pointInPolygonPlanar(std::vector<double> &x, std::vector<double> &y);
+		std::vector<int> pointInPolygonGeo(std::vector<double> &x, std::vector<double> &y);
 
 		SpatVector crop(SpatExtent e, bool wrap);
 		SpatVector crop(SpatVector e);
+		SpatVector hexagons(SpatExtent e, double size, std::string crs, bool flat_top, double anchor_x, double anchor_y);
+		SpatVector hexagons_lonlat(SpatExtent e, double size, bool flat_top);
+		SpatVector rectangles_lonlat(SpatExtent e, double size, int align);
+		SpatVector polyhedron(SpatExtent e, int n, bool full_globe);
+
 		SpatVector voronoi(SpatVector bnd, double tolerance, int onlyEdges);		
 		SpatVector voronoi_sphere(SpatVector bnd, double tolerance, int onlyEdges);
 
@@ -408,6 +421,7 @@ class SpatVector {
 		SpatVector cbind(SpatDataFrame d);
 		void fix_lonlat_overflow();
 		SpatVector cross_dateline(bool &fixed);
+		//double adviseDensify(double xmin=NAN, double xmax=NAN);
 		SpatVector densify(double interval, bool adjust, bool ignorelonlat);
 		SpatVector round(int digits);
 		std::vector<size_t> nullGeoms();
@@ -489,6 +503,8 @@ class SpatVectorCollection {
 		
 		SpatVector append();
 		SpatVectorCollection from_hex_col(std::vector<std::string> x, std::string srs);
+
+		std::string show();
 		
 };
 
@@ -501,6 +517,7 @@ class SpatVectorProxy {
 		virtual ~SpatVectorProxy(){}
 		SpatVectorProxy deepCopy() {return *this;}
 		SpatVector query_filter(std::string query, std::vector<double> extent, SpatVector filter);
+		std::string show();
 };
 
 

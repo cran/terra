@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2025  Robert J. Hijmans
+// Copyright (c) 2018-2026  Robert J. Hijmans
 //
 // This file is part of the "spat" library.
 //
@@ -29,14 +29,14 @@
 #endif
 
 
-SpatRaster::SpatRaster(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip, bool guessCRS, std::vector<std::string> domains) {
+SpatRaster::SpatRaster(std::string fname, std::vector<int> subds, std::vector<std::string> subdsname, std::vector<std::string> drivers, std::vector<std::string> options, bool noflip, bool guessCRS, std::vector<std::string> domains, size_t md) {
 #ifdef useGDAL
-	constructFromFile(fname, subds, subdsname, drivers, options, noflip, guessCRS, domains);
+	constructFromFile(fname, subds, subdsname, drivers, options, {}, noflip, guessCRS, domains, md);
 #endif
 }
 
 
-SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, bool multi, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<int> dims, bool noflip, bool guessCRS, std::vector<std::string> domains) {
+SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, std::vector<std::string> subdsname, size_t /*multi*/, std::vector<std::string> drivers, std::vector<std::string> options, std::vector<int> dims, bool noflip, bool guessCRS, std::vector<std::string> domains, size_t md) {
 
 	if (fname.empty()) {
 		setError("no filename");
@@ -44,19 +44,14 @@ SpatRaster::SpatRaster(std::vector<std::string> fname, std::vector<int> subds, s
 	}
 
 #ifdef useGDAL
-	if (multi) {
-		constructFromFileMulti(fname[0], subds, subdsname, drivers, options, dims, noflip, guessCRS, domains);
-		return;
-	}
-
-	if (!constructFromFile(fname[0], subds, subdsname, drivers, options, noflip, guessCRS, domains)) {
+	if (!constructFromFile(fname[0], subds, subdsname, drivers, options, dims, noflip, guessCRS, domains, md)) {
 		//setError("cannot open file: " + fname[0]);
 		return;
 	}
 	SpatOptions opt;
 	for (size_t i=1; i<fname.size(); i++) {
 		SpatRaster r;
-		bool ok = r.constructFromFile(fname[i], subds, subdsname, drivers, options, noflip, guessCRS, domains);
+		bool ok = r.constructFromFile(fname[i], subds, subdsname, drivers, options, dims, noflip, guessCRS, domains, md);
 		if (r.msg.has_warning) {
 			addWarning(r.msg.warnings[0]);
 		}

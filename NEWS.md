@@ -1,17 +1,65 @@
-# version 1.9-11
+# version 1.9-25
 
 ## bug fixes
 
-- `subst` and some cases of `classify`, did not recycle properly [](https://github.com/rspatial/terra/issues/2046) by Nuno Teixeira and [#2052](https://github.com/rspatial/terra/issues/2052) by Jérôme Guélat
+- terra now distinguishes between the "standard"/"Gregorian" and the "proleptic_gregorian" calendars [#1599](https://github.com/rspatial/terra/issues/1599) by Hu shiyu
+- `spatSample<SpatRaster>(method="stratified")` could cause an out of bounds error [#1858](https://github.com/rspatial/terra/issues/1858) by Felipe)
+- `vrt` on OSX had trouble with options [#1410](https://github.com/rspatial/terra/issues/1410) by Andrea Manica. And occasionally on Windows [#1848](https://github.com/rspatial/terra/issues/1848) by Monika Anna Tomaszewska; due to passing them as a dangling pointer.
+- `rbind<SpatVector,SpatVector>` could make R crash when combining a variable that is numeric in one and boolean in the other source [#2069](https://github.com/rspatial/terra/issues/2069) by Hans van Calster
+- `vect` can now better handle non standard geometries such as multisurface [#2037](https://github.com/rspatial/terra/issues/2037) by Floris Vanderhaeghe
+- `writeVector` can now write GPX format [#1231](https://github.com/rspatial/terra/issues/1231) by Krzysztof Dyba
+- better handling of rotated rasters [#1434](https://github.com/rspatial/terra/issues/1434) by Insang Song and [#918](https://github.com/rspatial/terra/issues/918) by Agustin Lobo
+- `zonal` truncated weights [#2072](https://github.com/rspatial/terra/issues/2072) by Dominic Royé
+- `distance<SpatRaster>` with haversine method could overflow from N to S pole [#2077](https://github.com/rspatial/terra/issues/2077) by brshipley 
+
+
+## enhancements
+
+- `memmax` now defaults to 16 GB to prevent allocation failures on very large memory systems [#2073](https://github.com/rspatial/terra/issues/2073) by Will Kessler
+- `update` can (again) edit layernames in existing files [#2071](https://github.com/rspatial/terra/issues/2071) by Jim Shady
+- `compareGeom` gets argument "tolerance" to overwrite the default that can be set with `terraOptions`. [#2056](https://github.com/rspatial/terra/issues/2056) by R. Kyle Bocinsky
+- `vect<data.frame>` now warns when it guesses the geom variables and/or the lon/lat CRS [#1985](https://github.com/rspatial/terra/issues/1985) by Márcia Barbosa
+- consistent warnings about missing CRS in distance functions. [#1924](https://github.com/rspatial/terra/issues/1924) by Márcia Barbosa
+- `aggregate<SpatRaster>` no longer loses time attributes [#2066](https://github.com/rspatial/terra/issues/2066) by Wencheng Lau-Medrano
+- the number of files that the OS allows to be simultaneously open sets a limit for processing SpatRasters that is now detected [#1993](
+https://github.com/rspatial/terra/issues/1993) by Enrico Mattea
+- additional effort to read KML/Z attribute values [#1954](https://github.com/rspatial/terra/issues/1954) by Yong-hun Suh
+- `autocor` gets a "standardize" argument for row-standardization [#1593](https://github.com/rspatial/terra/issues/1593) by Nicholas Berryman
+- `plet` gains argument "hover" [#1571](https://github.com/rspatial/terra/issues/1571) by Agustin Lobo
+- `sbar` gets argument "bg" to set a background color [#1957](https://github.com/rspatial/terra/issues/1957) by Lucas Salinas Morales
+- better support for writing vsizip files [#1629](https://github.com/rspatial/terra/issues/1629) by Eric R. Scott
+- better error message if `project` fails because a transformation grid cannot be downloaded [#1425](https://github.com/rspatial/terra/issues/1425) by Kevin J Wolz
+- PROJ CDN warnings (e.g. SSL errors when downloading datum grids) are now collapsed into a single summary warning with guidance to use `projNetwork(FALSE)` [#1351](https://github.com/rspatial/terra/issues/1351) by Hassan Masoomi
+
+
+## new 
+
+- `costDistance` and `gridDistance` can now return the nearest target cell number [#2034](https://github.com/rspatial/terra/issues/2034) by chrislittleboy
+- `update` can write cell values to existing files [#1079](https://github.com/rspatial/terra/issues/1079) by Mike Koontz
+- `mosaic(fun="blend")` method to combine rasters with smooth gradients in overlapping zones [#2011](https://github.com/rspatial/terra/issues/2011) by Greg Schmidt
+- `animate<SpatVectorCollection>` method. [#2065](https://github.com/rspatial/terra/pull/2065) by Márcia Barbosa 
+- `thin<SpatVector>` method. [#1738](https://github.com/rspatial/terra/issues/1738) by Andrés
+- `legend_cont` method to draw a continuous legend independent of `plot` [#2057](https://github.com/rspatial/terra/issues/2057) by Lucas Salinas Morales
+- `proj_pipelines` function to retrieve CRS transformation pipelines that can be used in `project` [#1350](https://github.com/rspatial/terra/issues/1350) by Richard A. Johansen
+- `tessellate` method to create hexagonal and rectangular tessellations
+- `tile_apply` for parallelization
+
+
+# version 1.9-11
+
+Released 2026-03-26
+
+## bug fixes
+
+- `subst` and some cases of `classify`, did not recycle properly [#2046](https://github.com/rspatial/terra/issues/2046) by Nuno Teixeira and [#2052](https://github.com/rspatial/terra/issues/2052) by Jérôme Guélat
 - better reading of gpkg files with unclear geometry and NULL geoms [#2051](https://github.com/rspatial/terra/issues/2051) by Duy Nguyen
 - `ifel` ignored NA values in some circumstances [SO 79905693](https://stackoverflow.com/questions/79905693) by Sean McKenzie
-- `spatSample` failed if checkerboard sampling if a stratum was empty [#2060](https://github.com/rspatial/terra/issues/2060) by Tyler Smith
+- `spatSample` failed with checkerboard sampling if a stratum was empty [#2060](https://github.com/rspatial/terra/issues/2060) by Tyler Smith
 
 ## enhancements
 
 - `plot<SpatVector>` has new argument "fill_range"
 - `extract` gains argument "wide=FALSE" that can be used when fun="table" [2053](https://github.com/rspatial/terra/issues/2053) by Jérôme Guélat
-
 
 # version 1.9-1
 
@@ -239,7 +287,7 @@ Released 2025-05-09
 - `depth` information was dropped even when there was no reason for that [#1806](https://github.com/rspatial/terra/issues/1806) by Daniel R Schlaepfer
 - `plet` did not work for logical SpatRasters [#1820](https://github.com/rspatial/terra/issues/1820) by Andrew Gene Brown
 - `extract<SpatRaster>` with a "window" set, did not work properly [#1819](https://github.com/rspatial/terra/issues/1819) by Derek Friend
-- `extract<SpatRaster>` with argument "layers" and xy=TRUE added an unexpected additional column [#1818](https://github.com/rspatial/terra/issues/1818) by Breeze-Hu
+- `extract<SpatRaster>` with argument "layers" and xy=TRUE added an unexpected additional column [#1818](https://github.com/rspatial/terra/issues/1818) by Hu shiyu
 - `extractRange` now honors arguments `bind` and assigns `ID` within a list [#1816](https://github.com/rspatial/terra/issues/1816) by WillhKessler
 - `crop<SpatRaster,SpatVector>(mask=TRUE)` did not crop if the SpatVector was (partly) outside the SpatVector [#1824](https://github.com/rspatial/terra/issues/1824) by Márcia Barbosa
 
