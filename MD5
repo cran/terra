@@ -1,6 +1,6 @@
-780212d9945bfd96cfa8da60d5c1d659 *DESCRIPTION
+32cda428df5dcf95ffe567296737062e *DESCRIPTION
 d7f1cd0d09a5967a01b7e567fb39dcc2 *NAMESPACE
-f315e703ff922473ec5970753ee11be3 *NEWS.md
+a17a8b4a4c0cbca388957ba336a56631 *NEWS.md
 4642e0e1e591ce143227e46ced860952 *R/Aclasses.R
 f9f24bfd4a9b6d834d7b0c21c09c3d1f *R/Agenerics.R
 5a20192404169a0b96501cfbb206d8de *R/Arith_generics.R
@@ -36,7 +36,7 @@ bf947141a7a2f95f7f4a913ac6659617 *R/focal.R
 1b1914e00d4a7a705a9740f03ba346a4 *R/focalMat.R
 811d41836c71e1c68b770d551bdd0f3d *R/gcp.R
 3e7b565d32e0057de674cad396d2b777 *R/gdal.R
-f68237e910b907bd7908099a5b842048 *R/generics.R
+d53c88311065c065b3857cbe2e310a24 *R/generics.R
 ed060034e1a6339e8a379641431b87e3 *R/geocolors.R
 789e224a2fd1394033714afaff66bd17 *R/geom.R
 89e461d86331a6117cf56a530382ce2e *R/graticule.R
@@ -168,7 +168,7 @@ dc55a42e624dc5c2e421e47e0b6b34e5 *inst/tinytest/test_nc.R
 f703827b06f9f00110a3d9ec490a41d6 *inst/tinytest/test_patches.R
 d0661754a9dea8f5473b3fa4e96749ee *inst/tinytest/test_pitfinder.R
 6a7c5b1d055df04e04c5c9d2528b9f9a *inst/tinytest/test_plot.R
-c432ab505a38721b0a6ed0a042d1311c *inst/tinytest/test_proj_pipelines.R
+4353a8fe7ce6f7836b03cb8505d83c5d *inst/tinytest/test_project.R
 d840b32f75668a12958d026b93c37e1e *inst/tinytest/test_raster-local.R
 9e82a26cbba71c9149ff7759b6292cfc *inst/tinytest/test_raster-vector.R
 b3861680dce42d4940fb1114183ac792 *inst/tinytest/test_rasterize.R
@@ -476,7 +476,7 @@ ed28a4300ef2654185a17913f0a0972b *src/RcppModule.cpp
 06304e8ea49af9f25be380ec9070c8fa *src/catchments.cpp
 7f3d6c5a21d4d67f49a236d4d1032613 *src/common.h
 0e065123f6ead07e06ac540dc990588d *src/costDistance.cpp
-017a04d33f07ecc47ea3074bb1aef065 *src/crs.cpp
+8a97a0c696b3dd723c333d6404c0564f *src/crs.cpp
 00800d9503cb2071bfebe1eb4ecfafc3 *src/crs.h
 1b8482f0bce855911081772c074b4ccc *src/date.h
 f279340a432552558cac54d87a7b22ae *src/distRaster.cpp
@@ -505,7 +505,7 @@ b52cd3c1030b5ba35ec7caf2e19f01a2 *src/math_utils.cpp
 2d7682cedbe4ea1d14e54fcf171022e7 *src/merge.cpp
 5d8eb73c75ffec9fd4a9406888359539 *src/ram.cpp
 24dd35fc3503bf56e551bf7e93464aff *src/ram.h
-5b6312cbd238305b43fd8ad47c7ad0d5 *src/raster_methods.cpp
+ab2bd39fb3db0637204a0460322ec330 *src/raster_methods.cpp
 9ee90d9a487fb11e5e2795af389157f1 *src/raster_stats.cpp
 5f2569b546815611d885ebe085c78bbd *src/rasterize.cpp
 5820e39ae0305c7c64906200a7ff2720 *src/read.cpp
@@ -538,7 +538,7 @@ c815eca4461b175f7b9ba11f5544c39b *src/spatVector.cpp
 bdc204a8d3df5787a128ad823ff607bc *src/table_utils.cpp
 f9555b912f90f6eb16abbc75506657d4 *src/table_utils.h
 5fc258b182a6deac1ee7c15cdb72ec14 *src/tbb_helper.h
-998410073dcbeffeb9b4c985d889589e *src/tessellate.cpp
+3ee6e55a6af00ca5c0c57033c33f2dd3 *src/tessellate.cpp
 03f69ded6374e3dc3b1ea9c976eb2f1a *src/vecmath.cpp
 b9bdb679b484eb0a43cf91ce54c2c0f5 *src/vecmath.h
 f1bd4d29434e32dcfee3237581e05a37 *src/vecmathse.cpp
