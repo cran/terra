@@ -103,6 +103,7 @@ class SpatGeom {
 
 
 class SpatVectorCollection;
+class SpatNetwork;
 
 class SpatVector {
 
@@ -340,7 +341,7 @@ class SpatVector {
 		SpatVector shared_paths(SpatVector x, bool index);
 		SpatVector snap(double tolerance);
 		SpatVector snapto(SpatVector y, double tolerance);
-		SpatVector thin_nodes(double threshold);
+		SpatVector thin_nodes(double threshold, std::string unit);
 		SpatVector split_lines(SpatVector v);
 		SpatVector allerretour();
 		SpatVectorCollection bienvenue();
@@ -417,6 +418,7 @@ class SpatVector {
 		SpatVector width();
 
 		SpatVector unaryunion();
+		SpatNetwork as_network(double snap, bool merge, bool directed, bool weighted);
 
 		SpatVector cbind(SpatDataFrame d);
 		void fix_lonlat_overflow();

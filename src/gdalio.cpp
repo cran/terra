@@ -615,6 +615,29 @@ bool SpatRaster::open_gdal(GDALDatasetH &hDS, int src, bool update, SpatOptions 
 		}
 	}
 
+#if GDAL_VERSION_NUM >= 3040000
+    // Expose multidim API as classic
+	// only safe when the layer<->band mapping is trivial; otherwise use memory
+	if (fromfile && (!update) && source[isrc].is_multidim) {
+		bool simple = (source[isrc].m_dims.size() == 2) || (source[isrc].m_dims.size() == 3);
+		if (simple && open_gdal_multidim(hDS, isrc)) {
+			return true;
+		}
+		// Cannot expose the array as a classic dataset directly
+		if (canProcessInMemory(opt)) {
+			fromfile = false;
+		} else {
+			SpatRaster tmp(source[isrc]);
+			tmp = tmp.writeTempRaster(opt);
+			if (tmp.hasError()) {
+				setError(tmp.getError());
+				return false;
+			}
+			return tmp.open_gdal(hDS, 0, update, opt);
+		}
+	}
+#endif
+
 	if (fromfile) {
 		std::string f;
 		//if (source[src].parameters_changed) {
