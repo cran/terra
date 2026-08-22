@@ -164,7 +164,7 @@ setMethod("crs", signature("SpatRasterDataset"),
 	if (inherits(x, "SpatVector") | inherits(x, "SpatRaster")) {
 		x <- crs(x)
 	}
-	if (is.null(x) || is.na(x)) {
+	if (isTRUE(is.null(x) || is.na(x))) {
 		x <- ""
 	} else if (inherits(x, "CRS")) {
 		if (warn) warn("crs", "expected a character string, not a CRS object")
@@ -175,12 +175,16 @@ setMethod("crs", signature("SpatRasterDataset"),
 		}
 		x <- y
 	} else if (is.character(x)) {
-		x <- x[1]
-		lowx <- tolower(x)
-		if (lowx == "local") {
-			x = 'LOCAL_CS["Cartesian (Meter)", LOCAL_DATUM["Local Datum",0], UNIT["Meter",1.0], AXIS["X",EAST], AXIS["Y",NORTH]]'
-		} else if (lowx == "lonlat") {
-			x <- "+proj=longlat"
+		if (length(x) == 0) {
+			x <- ""
+ 		} else {
+			x <- x[1]
+			lowx <- tolower(x)
+			if (lowx == "local") {
+				x = 'LOCAL_CS["Cartesian (Meter)", LOCAL_DATUM["Local Datum",0], UNIT["Meter",1.0], AXIS["X",EAST], AXIS["Y",NORTH]]'
+			} else if (lowx == "lonlat") {
+				x <- "+proj=longlat"
+			}
 		}
 	} else {
 		error("crs", "I do not know what to do with this argument (expected a character string)")
@@ -188,6 +192,8 @@ setMethod("crs", signature("SpatRasterDataset"),
 	.check_proj4_datum(x)
 	x
 }
+
+crs_msg <- "Replacing a CRS only makes sense if the original was wrong.\nIf your goal is to transform the data to the new CRS, use `project` instead."
 
 setMethod("crs<-", signature("SpatRaster", "ANY"),
 	function(x, warn=FALSE, value) {
@@ -197,7 +203,7 @@ setMethod("crs<-", signature("SpatRaster", "ANY"),
 		}
 		value <- .txtCRS(value)
 		if (warn && (crs(x) != "") && (value != "")) {
-			message("Assigning a new crs. Use 'project' to transform a SpatRaster to a new crs")
+			message(crs_msg)
 		}
 		x@pntr <- x@pntr$deepcopy()
 		x@pntr$set_crs(value)
@@ -264,7 +270,7 @@ setMethod("crs<-", signature("SpatVector", "ANY"),
 		}
 		value <- .txtCRS(value)
 		if (warn && (crs(x) != "") && (value != "")) {
-			message("Assigning a new crs. Use 'project' to transform a SpatVector to a new crs")
+			message(crs_msg)
 		}
 		x@pntr <- x@pntr$deepcopy()
 		x@pntr$set_crs(value)

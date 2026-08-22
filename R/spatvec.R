@@ -38,6 +38,13 @@ setMethod("is.points", signature(x="SpatVector"),
 )
 
 
+setMethod("has.z", signature(x="SpatVector"),
+	function(x) {
+		x@pntr$has_z()
+	}
+)
+
+
 setMethod("geomtype", signature(x="Spatial"),
 	function(x){
 		type <- sub("spatial", "", as.vector(tolower(class(x)[1])))
@@ -60,7 +67,7 @@ setMethod("geom", signature(x="SpatVector"),
 		}	else {
 			g <- x@pntr$get_geometry()
 			g <- do.call(cbind, g)
-			colnames(g) <- c("geom", "part", "x", "y", "hole")[1:ncol(g)]
+			colnames(g) <- c("geom", "part", "x", "y", "hole", "z")[1:ncol(g)]
 			if (df) {
 				data.frame(g)
 			} else {
@@ -84,7 +91,7 @@ setMethod("crds", signature(x="SpatVector"),
 		} else {
 			g <- x@pntr$coordinates()
 			g <- do.call(cbind, g)
-			colnames(g) <- c("x", "y")
+			colnames(g) <- c("x", "y", "z")[1:ncol(g)]
 			if (df) {
 				data.frame(g)
 			} else {
@@ -252,8 +259,10 @@ setMethod("fillHoles", signature(x="SpatRaster"),
 
 
 setMethod("centroids", signature(x="SpatVector"),
-	function(x, inside=FALSE) {
-		if (inside) {
+	function(x, inside=FALSE, correct=FALSE) {
+		if (correct) {
+			x@pntr <- x@pntr$corrected_centroid(TRUE, isTRUE(inside))
+		} else if (inside) {
 			x@pntr <- x@pntr$point_on_surface(TRUE)
 		} else {
 			x@pntr <- x@pntr$centroid(TRUE)

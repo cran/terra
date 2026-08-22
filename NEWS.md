@@ -1,4 +1,49 @@
+# version 1.9-46
+
+## bug fixes
+
+- multidim vrt can now be opened [#2107](https://github.com/rspatial/terra/issues/2107)  by Michael Sumner
+- terra did not compile with GDAL > 3.0.4 & < 3.8 [#2109](https://github.com/rspatial/terra/issues/2109) by Andrew Gene Brown
+- terra did not compile with GDAL < 3.5 [#2111](https://github.com/rspatial/terra/issues/2111) by Wolfgang Viechtbauer
+- `distance<SpatRaster>` with a planar CRS ignored the "unit" (and misinterpreted the "maxdist") argument [#2139](https://github.com/rspatial/terra/issues/2139) by Jakub Nowosad
+- `focal` returned wrong values (in some versions Inf) near the end of a chunk when processing a raster in chunks (with restrictive memory options) if the last chunk had fewer rows than half the window size [#2138](https://github.com/rspatial/terra/issues/2138) by Chris Littleboy
+- `rasterize` with points could crash R (or silently corrupt memory) when the output raster was processed in chunks and the last point fell before the last chunk [#2142](https://github.com/rspatial/terra/issues/2142) by Agustín Lobo
+- output of `cartogram(x, type="nc")` was invisible [#2134](https://github.com/rspatial/terra/issues/2134) by Márcia Barbosa
+- `rast(, md=TRUE)` did not read the coordinates for HDF4/MODIS files [#2148](https://github.com/rspatial/terra/issues/2148) by Kodi Arfer
+- `tile_apply` failed on SpatRasters with more than one source [#2150](https://github.com/rspatial/terra/issues/2150) by ebkurtz
+- `as.polygons` on a file-backed multi-layer SpatRaster always used the first layer, not the selected layer [#2156](https://github.com/rspatial/terra/issues/2156) by Mehmet Göktuğ Öztürk
+- improved multidim handling of GRIB files [#2160](https://github.com/rspatial/terra/issues/2160) by Kodi Arfer.
+- improved mutlidim handling of HDF-EOS files [#2163](https://github.com/rspatial/terra/issues/2163) by Monika Anna Tomaszewska and 
+Kodi Arfer [#2162](https://github.com/rspatial/terra/issues/2162)
+- `spatSample` did not handle a combination of raster sources if some had a window and others not [#2164](
+https://github.com/rspatial/terra/issues/2164) by Krzysztof Dyba
+
+## enhancements
+
+- faster sampling of multidim rasters [#2110](https://github.com/rspatial/terra/issues/2110) by Michael Sumner
+- `extract` was very slow for multidim (e.g. NetCDF) files with compressed chunks [#2145](https://github.com/rspatial/terra/issues/2145) by Kodi Arfer
+- `centroids` gained argument "correct" that moves centroids that are not on their geometry to the nearest location on the geometry (`inside=FALSE`) or to an alternative location that is inside the polygon (`inside=TRUE`) 
+- `points`, `lines` and `polys` can now color the geometries by the values of a variable (argument `y`) [#2119](https://github.com/rspatial/terra/issues/2119) by Márcia Barbosa
+- `focal` can now use TBB parallelization for built-in functions "max", "min", "median", "modal" and "sd" (in addition to "sum"/"mean") [#2115](https://github.com/rspatial/terra/issues/2115) by Breeze-Hu
+- `focal` with "min" or "max" and an unweighted window is now faster, especially with large windows
+- the "threads" option now defaults to 16 (instead of no limit) to avoid run-away thread counts on machines with very many cores. The "threads" argument of `project` and `resample` can now also be a number
+- argument `adj` in `add_mtext` now better aligns text along the margins [#2158](https://github.com/rspatial/terra/pull/2158) by Mehmet Göktuğ Öztürk
+- `spatSample(method="startified")` now returns categorical values, not their integer representation [#2159](https://github.com/rspatial/terra/issues/2159) by Krzysztof Dyba
+
+
+## new 
+
+- `rast` better support for file that have geolocation/GCPs and new functions `has.geoloc` and `geoloc` [#1175](https://github.com/rspatial/terra/issues/1175) by Michael Sumner
+- `furdist` method to get the furthest distance from a point to any location on another geometry
+- `snapTo` method to move points to the nearest location on lines or polygons
+- `flowDir` method to compute path-based nondisperive flow direction by Emanuele Cordano
+- `pittfiller` method by Emanuele Cordano
+- `as.arrows` to show direction arrows on a raster by Emanuele Cordano
+
+
 # version 1.9-34
+
+Released 2026-06-20
 
 ## bug fixes
 
@@ -13,8 +58,7 @@
 
 ## enhancements
 
-- `extract<SpatRaster,SpatVector>` with polygons had become *much* slower [#2100](https://github.com/rspatial/terra/issues/2100)
-https://github.com/rspatial/terra/issues/2100) by Torsten Hauffe
+- `extract<SpatRaster,SpatVector>` with polygons had become *much* slower [#2100](https://github.com/rspatial/terra/issues/2100) by Torsten Hauffe
 - `regress` gained a `<SpatRaster,data.frame>` method to specify levels of factors
 - `extract(x, polygons, fun=...)` could fail with large polygons/high-res rasters. For standard functions (`sum`, `sum2`, `mean`, `min`, `max`, `prod`, `sd`, `std`, `isNA`, `notNA`) processing is now by block and memory safe [#2097](https://github.com/rspatial/terra/issues/2097)
 - `sprc(<character>)` gained argument `group=TRUE` to combine rasters with the same geometry; convenient for "one folder per tile, one file per band" situations
@@ -25,7 +69,7 @@ https://github.com/rspatial/terra/issues/2100) by Torsten Hauffe
 
 - `make.RGB` function [#2085](https://github.com/rspatial/terra/issues/2085) by Jérôme Guélat
 - `netw` to create `SpatNetwork` objects. The network can be directed or undirected and is by default weighted by edge length.
-- `SpatNetwork` methods: `shortestPath`, , `writeNetwork``net_nodes`, `net_edges`, `net_nnodes`, `net_nedges`, `net_directed`, `net_weights` and `net_weights<-`.
+- `SpatNetwork` methods: `shortestPath`, `writeNetwork`, `net_nodes`, `net_edges`, `net_nnodes`, `net_nedges`, `net_directed`, `net_weights` and `net_weights<-`.
 
 
 # version 1.9-27
@@ -73,6 +117,7 @@ https://github.com/rspatial/terra/issues/1993) by Enrico Mattea
 - better support for writing vsizip files [#1629](https://github.com/rspatial/terra/issues/1629) by Eric R. Scott
 - better error message if `project` fails because a transformation grid cannot be downloaded [#1425](https://github.com/rspatial/terra/issues/1425) by Kevin J Wolz
 - PROJ CDN warnings (e.g. SSL errors when downloading datum grids) are now collapsed into a single summary warning with guidance to use `projNetwork(FALSE)` [#1351](https://github.com/rspatial/terra/issues/1351) by Hassan Masoomi
+- TBB parallel processing is now turned on by default. See `?terraOptions`
 
 
 ## new 

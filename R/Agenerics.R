@@ -6,8 +6,12 @@ if (!isGeneric("watershed")) {setGeneric("watershed", function(x, ...) standardG
 if (!isGeneric("pitfinder")) {setGeneric("pitfinder", function(x, ...) standardGeneric("pitfinder"))}
 if (!isGeneric("NIDP")) {setGeneric("NIDP", function(x, ...) standardGeneric("NIDP"))}
 if (!isGeneric("flowAccumulation")) {setGeneric("flowAccumulation", function(x, ...) standardGeneric("flowAccumulation"))}
+if (!isGeneric("flowDir")) {setGeneric("flowDir", function(x, ...) standardGeneric("flowDir"))}
+if (!isGeneric("pitfiller")) {setGeneric("pitfiller", function(x, pit, ...) standardGeneric("pitfiller"))}
 
 if (!isGeneric("tessellate")) {setGeneric("tessellate", function(x, ...) standardGeneric("tessellate"))}
+
+if (!isGeneric("snapTo")) {setGeneric("snapTo", function(x, y, ...) standardGeneric("snapTo"))}
 
 if (!isGeneric("agitate")) {setGeneric("agitate", function(x, ...) standardGeneric("agitate"))}
 
@@ -77,6 +81,7 @@ if (!isGeneric("combineGeoms")) {setGeneric("combineGeoms", function(x, y, ...) 
 if (!isGeneric("concats")) {setGeneric("concats", function(x, ...) standardGeneric("concats"))}
 if (!isGeneric("has.colors")) {setGeneric("has.colors", function(x, ...) standardGeneric("has.colors"))}
 if (!isGeneric("has.RGB")) {setGeneric("has.RGB", function(x, ...) standardGeneric("has.RGB"))}
+if (!isGeneric("has.z")) {setGeneric("has.z", function(x, ...) standardGeneric("has.z"))}
 
 if (!isGeneric("emptyGeoms")) {setGeneric("emptyGeoms", function(x, ...) standardGeneric("emptyGeoms"))}
 
@@ -159,6 +164,8 @@ if (!isGeneric("not.na")) {setGeneric("not.na", function(x, ...) standardGeneric
 if (!isGeneric("erase")) {setGeneric("erase", function(x, y, ...) standardGeneric("erase"))}
 if (!isGeneric("gaps")) {setGeneric("gaps", function(x, ...) standardGeneric("gaps"))}
 if (!isGeneric("is.rotated")) {setGeneric("is.rotated", function(x, ...) standardGeneric("is.rotated"))}
+if (!isGeneric("has.geoloc")) {setGeneric("has.geoloc", function(x, ...) standardGeneric("has.geoloc"))}
+if (!isGeneric("geoloc")) {setGeneric("geoloc", function(x, ...) standardGeneric("geoloc"))}
 if (!isGeneric("is.flipped")) {setGeneric("is.flipped", function(x, ...) standardGeneric("is.flipped"))}
 
 if (!isGeneric("is.num")) {setGeneric("is.num", function(x) standardGeneric("is.num"))}
@@ -311,6 +318,7 @@ if (!isGeneric("aggregate")) {setGeneric("aggregate", function(x, ...) standardG
 if (!isGeneric("disagg")) {setGeneric("disagg", function(x, ...) standardGeneric("disagg"))}
 if (!isGeneric("costDist")) {setGeneric("costDist", function(x, ...)standardGeneric("costDist"))}
 if (!isGeneric("gridDist")) {setGeneric("gridDist", function(x, ...)standardGeneric("gridDist"))}
+if (!isGeneric("furdist")) {setGeneric("furdist", function(x, y, ...)standardGeneric("furdist"))}
 if (!isGeneric("distance")) {setGeneric("distance", function(x, y, ...)standardGeneric("distance"))}
 if (!isGeneric("direction")) {setGeneric("direction", function(x, ...)standardGeneric("direction"))}
 if (!isGeneric("extract")) { setGeneric("extract", function(x, y, ...) standardGeneric("extract"))}

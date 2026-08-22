@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <list>
 #include <functional>
+#include <cstring>
 #include <string>
 #include <thread>
 #include <atomic>
@@ -417,6 +418,12 @@ static bool handle_proj_noise(const char *msg, int err_no) {
 	return false;
 }
 
+// cosmetic noise from broken file metadata #2161
+static bool is_multidim_convert_noise(const char *msg) {
+	if (msg == NULL) return false;
+	return std::strstr(msg, "Array data type is not convertible to buffer data type") != NULL;
+}
+
 // Replay any messages that were queued from GDAL worker threads. Must only be
 // called on the main thread (from the error handlers below).
 static void drain_offthread_messages() {
@@ -439,12 +446,12 @@ static void __err_warning(CPLErr eErrClass, int err_no, const char *msg) {
             break;
         case 1:
         case 2:
-            if (!handle_proj_noise(msg, err_no)) {
+            if (!handle_proj_noise(msg, err_no) && !is_multidim_convert_noise(msg)) {
                 warningNoCall("%s (GDAL %d)", msg, err_no);
             }
             break;
         case 3:
-            if (!handle_proj_noise(msg, err_no)) {
+            if (!handle_proj_noise(msg, err_no) && !is_multidim_convert_noise(msg)) {
                 warningNoCall("%s (GDAL error %d)", msg, err_no);
             }
             break;
@@ -452,7 +459,7 @@ static void __err_warning(CPLErr eErrClass, int err_no, const char *msg) {
             stopNoCall("%s (GDAL unrecoverable error %d)", msg, err_no);
             break;
         default:
-            if (!handle_proj_noise(msg, err_no)) {
+            if (!handle_proj_noise(msg, err_no) && !is_multidim_convert_noise(msg)) {
                 warningNoCall("%s (GDAL error class %d, #%d)", msg, eErrClass, err_no);
             }
             break;
@@ -469,7 +476,7 @@ static void __err_error(CPLErr eErrClass, int err_no, const char *msg) {
         case 2:
             break;
         case 3:
-            if (!handle_proj_noise(msg, err_no)) {
+            if (!handle_proj_noise(msg, err_no) && !is_multidim_convert_noise(msg)) {
                 warningNoCall("%s (GDAL error %d)", msg, err_no);
             }
             break;
@@ -512,15 +519,18 @@ void set_gdal_warnings(int level) {
 	// Called from gdal_init() at package load, i.e. on R's main thread before
 	// any GDAL operation (and thus before any GDAL worker thread) can run.
 	terra_remember_main_thread();
+	CPLErrorHandler h;
 	if (level==4) {
-		CPLSetErrorHandler((CPLErrorHandler)__err_none);
+		h = (CPLErrorHandler)__err_none;
 	} else if (level==1) {
-		CPLSetErrorHandler((CPLErrorHandler)__err_warning);
+		h = (CPLErrorHandler)__err_warning;
 	} else if (level==2) {
-		CPLSetErrorHandler((CPLErrorHandler)__err_error);
+		h = (CPLErrorHandler)__err_error;
 	} else {
-		CPLSetErrorHandler((CPLErrorHandler)__err_fatal);
+		h = (CPLErrorHandler)__err_fatal;
 	}
+	gdal_set_terra_error_handler(h);
+	CPLSetErrorHandler(h);
 }
 
 #include "common.h"
@@ -646,7 +656,7 @@ double getGDALCacheSizeMB(bool vsi) {
 			return(NAN);
 		}
 		return(v);
-		
+
 	} else {
 		return static_cast<double>(GDALGetCacheMax64() / 1024 / 1024);
 	}
@@ -790,7 +800,7 @@ void removeDriver(std::vector<std::string> d) {
 
 // [[Rcpp::export(name = ".pearson")]]
 double pearson_cor(std::vector<double> x, std::vector<double> y, bool narm) {
- 
+
 	if (narm) {
 		size_t n = x.size()-1;
 		for (long i=n; i >= 0; i--) {
@@ -823,7 +833,7 @@ double pearson_cor(std::vector<double> x, std::vector<double> y, bool narm) {
 
 // [[Rcpp::export(name = ".weighted_pearson")]]
 double weighted_pearson_cor(std::vector<double> x, std::vector<double> y, std::vector<double> weights, bool narm=true) {
-  
+
 	if (narm) {
 		size_t n = x.size()-1;
 		for (long i=n; i >= 0; i--) {

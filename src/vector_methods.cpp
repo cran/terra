@@ -233,7 +233,7 @@ SpatVector SpatVector::elongate(double length, bool flat) {
 	}
 
 	bool geo = (!flat) && is_lonlat();
-	
+
 	for (size_t i=0; i<n; i++) {
 		for (size_t j=0; j < out.geoms[i].size(); j++) {
 			SpatPart p = out.geoms[i].parts[j];
@@ -326,8 +326,13 @@ SpatVector SpatVector::get_holes() {
 			SpatPart p = geoms[i].parts[j];
 			if (p.hasHoles()) {
 				for (size_t k=0; k < p.nHoles(); k++) {
-					SpatPart h(p.holes[k].x, p.holes[k].y);
-					g.addPart(h);
+					if (p.holes[k].hasZ()) {
+						SpatPart h(p.holes[k].x, p.holes[k].y, p.holes[k].z);
+						g.addPart(h);
+					} else {
+						SpatPart h(p.holes[k].x, p.holes[k].y);
+						g.addPart(h);
+					}
 				}
 				found = true;
 			}
@@ -365,7 +370,11 @@ SpatVector SpatVector::set_holes(SpatVector x, size_t i) {
 	SpatPart p  = out.geoms[i].parts[0];
 	SpatGeom g =   x.geoms[0];
 	for (size_t i=0; i<g.size(); i++) {
-		p.addHole(g.parts[i].x, g.parts[i].y);
+		if (g.parts[i].hasZ()) {
+			p.addHole(g.parts[i].x, g.parts[i].y, g.parts[i].z);
+		} else {
+			p.addHole(g.parts[i].x, g.parts[i].y);
+		}
 	}
 	out = *this;
 	out.geoms[i].parts[0] = p;
@@ -632,7 +641,7 @@ SpatVector SpatVector::rotate(double angle, std::vector<double> x0, std::vector<
 		recycle(x0, n);
 		recycle(y0, n);
 	}
-	
+
 	double cos_angle, sin_angle;
 	std::function<void(std::vector<double>&, std::vector<double>&, const double&, const double&, const double&, const double&)>  rotate_it;
 	if (is_lonlat()) {
@@ -844,7 +853,7 @@ SpatVector SpatVector::thin_nodes(double threshold, std::string unit) {
 SpatVector SpatVector::removeSlivers(double dthres, double athres, size_t n) {
 
 	SpatVector out;
-	
+
 	if (geoms.empty() || geoms[0].gtype != polygons) {
 		out.setError("can only remove slivers from polygons");
 		return out;

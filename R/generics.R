@@ -34,6 +34,27 @@ setMethod("is.flipped", signature(x="SpatRaster"),
 )
 
 
+setMethod("has.geoloc", signature(x="SpatRaster"),
+	function(x) {
+		x@pntr$has_geoloc()
+	}
+)
+
+
+setMethod("geoloc", signature(x="SpatRaster"),
+	function(x) {
+		data.frame(
+			geolocation = x@pntr$has_geoloc(),
+			gcps = x@pntr$has_gcps(),
+			srs = x@pntr$geoloc_srs(),
+			x = x@pntr$geoloc_x(),
+			y = x@pntr$geoloc_y(),
+			stringsAsFactors = FALSE
+		)
+	}
+)
+
+
 setMethod("rangeFill", signature(x="SpatRaster"),
 	function(x, limit, circular=FALSE, filename="", ...) {
 		opt <- spatOptions(filename, ...)
@@ -796,6 +817,8 @@ setMethod("project", signature(x="SpatRaster"),
 		} else {
 			if (!is.character(y)) {
 				y <- as.character(crs(y))
+			} else {
+				y <- character_crs(y, "project")
 			}
 			if (!is.null(res) || !is.null(origin)) {
 				tmp <- project(rast(x), y)
@@ -870,6 +893,8 @@ setMethod("project", signature(x="SpatVector"),
 		}
 		if (!is.character(y)) {
 			y <- as.character(crs(y))
+		} else {
+			y <- character_crs(y, "project")
 		}
 
 		if (is.null(AOI)) {
@@ -956,8 +981,8 @@ setMethod("quantile", signature(x="SpatVector"),
 
 
 setMethod("rectify", signature(x="SpatRaster"),
-	function(x, method="bilinear", aoi=NULL, snap=TRUE, filename="", ...) {
-		opt <- spatOptions(filename, ...)
+	function(x, method="bilinear", aoi=NULL, snap=TRUE, threads=FALSE, filename="", ...) {
+		opt <- spatOptions(filename, threads=threads, ...)
 		if (!is.null(aoi)) {
 			if (inherits(aoi, "SpatExtent")) {
 				aoi <- rast(aoi)

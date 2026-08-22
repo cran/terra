@@ -28,6 +28,7 @@
 #include "spatTime.h"
 #include "recycle.h"
 #include <stddef.h>
+#include <sstream>
 #include <cmath>
 #include <algorithm>
 #include <cstdint>
@@ -43,6 +44,8 @@ static bool md_is_col_dim_name(const std::string &nm) {
 	std::string n = lower_case(lrtrim_copy(nm));
 	if (n == "longitude" || n == "easting" || n == "eastings") return true;
 	if (n == "lon" || n == "long" || n == "x" || n == "proj_x") return true;
+	// HDF-EOS grid axes (MODIS MCD12C1, etc.)
+	if (n == "xdim" || n == "xaxis" || n == "x_dim") return true;
 	return false;
 }
 
@@ -50,7 +53,18 @@ static bool md_is_row_dim_name(const std::string &nm) {
 	std::string n = lower_case(lrtrim_copy(nm));
 	if (n == "latitude" || n == "northing" || n == "northings") return true;
 	if (n == "lat" || n == "y" || n == "proj_y") return true;
+	if (n == "ydim" || n == "yaxis" || n == "y_dim") return true;
 	return false;
+}
+
+static bool md_is_horizontal_x_type(const std::string &dtype) {
+	std::string t = lower_case(lrtrim_copy(dtype));
+	return t == "horizontal_x";
+}
+
+static bool md_is_horizontal_y_type(const std::string &dtype) {
+	std::string t = lower_case(lrtrim_copy(dtype));
+	return t == "horizontal_y";
 }
 
 static bool md_is_time_dim_name(const std::string &nm) {
@@ -67,16 +81,48 @@ static bool md_is_vertical_dim_name(const std::string &nm) {
 		|| in_string(n, "plev");
 }
 
-static int md_find_col_dim(const std::vector<std::string> &dimnames) {
+// look for  unambiguous lon/lat signals: coordinate units ("degrees_east" /
+// "degrees_north") or explicit longitude/latitude dimension names
+static bool md_is_lon_unit(const std::string &u) {
+	std::string s = lower_case(lrtrim_copy(u));
+	return s == "degrees_east" || s == "degree_east" || s == "degrees east"
+		|| s == "degree_e" || s == "degrees_e" || s == "degreese";
+}
+
+static bool md_is_lat_unit(const std::string &u) {
+	std::string s = lower_case(lrtrim_copy(u));
+	return s == "degrees_north" || s == "degree_north" || s == "degrees north"
+		|| s == "degree_n" || s == "degrees_n" || s == "degreesn";
+}
+
+static bool md_is_lon_name(const std::string &nm) {
+	std::string n = lower_case(lrtrim_copy(nm));
+	return n == "longitude" || n == "lon" || n == "long";
+}
+
+static bool md_is_lat_name(const std::string &nm) {
+	std::string n = lower_case(lrtrim_copy(nm));
+	return n == "latitude" || n == "lat";
+}
+
+static int md_find_col_dim(const std::vector<std::string> &dimnames,
+		const std::vector<std::shared_ptr<GDALDimension>> &dimData) {
 	for (size_t i = 0; i < dimnames.size(); i++) {
 		if (md_is_col_dim_name(dimnames[i])) return (int) i;
+	}
+	for (size_t i = 0; i < dimData.size(); i++) {
+		if (md_is_horizontal_x_type(dimData[i]->GetType())) return (int) i;
 	}
 	return -1;
 }
 
-static int md_find_row_dim(const std::vector<std::string> &dimnames) {
+static int md_find_row_dim(const std::vector<std::string> &dimnames,
+		const std::vector<std::shared_ptr<GDALDimension>> &dimData) {
 	for (size_t i = 0; i < dimnames.size(); i++) {
 		if (md_is_row_dim_name(dimnames[i])) return (int) i;
+	}
+	for (size_t i = 0; i < dimData.size(); i++) {
+		if (md_is_horizontal_y_type(dimData[i]->GetType())) return (int) i;
 	}
 	return -1;
 }
@@ -151,20 +197,6 @@ static void md_layer_to_indices(size_t layer, const std::vector<size_t> &sizes,
 	}
 }
 
-// Linear index into a GDAL MDArray Read buffer: dim 0 slowest, dim N-1 fastest,
-// with strides[k] = product of count[m] for m > k (see GDALMDArray::Read).
-static size_t md_layer_to_read_linear(size_t layer_id, const std::vector<size_t> &extra_sizes,
-		const std::vector<size_t> &m_dims_terra, const std::vector<size_t> &stride_all) {
-	std::vector<size_t> idx;
-	md_layer_to_indices(layer_id, extra_sizes, idx);
-	size_t linear = 0;
-	for (size_t e = 0; e < idx.size(); e++) {
-		size_t gd = m_dims_terra[2 + e];
-		linear += idx[e] * stride_all[gd];
-	}
-	return linear;
-}
-
 // GDAL row-major: last dimension in the array (highest index) varies fastest in the
 // read buffer. Terra uses one row = fixed latitude, columns = longitude (lon fastest
 // within the row). If lon's index > lat's (ix > iy), the read buffer is already
@@ -217,8 +249,30 @@ bool parse_ncdf_time(SpatRasterSource &s, const std::string unit, const std::str
 	bool seconds = false;
 	bool foundorigin = false;
 	std::string step;
-	
+
 	lowercase(origin);
+	// GDAL GRIB multidim driver uses units like "sec/seconds/day UTC" for "<unit> since 1970-01-01 UTC".
+	// normalize to a CF-compliant "<unit> since 1970-01-01 00:00:00" before parsing
+	{
+		bool utc_epoch = (origin.find("utc") != std::string::npos || origin.find("gmt") != std::string::npos) &&
+						 origin.find("since") == std::string::npos &&  origin.find("from") == std::string::npos;
+		if (utc_epoch) {
+			std::string norm;
+			if (origin.find("sec") != std::string::npos) {
+				norm = "seconds";
+			} else if (origin.find("min") != std::string::npos) {
+				norm = "minutes";
+			} else if (origin.find("hour") != std::string::npos) {
+				norm = "hours";
+			} else if (origin.find("day") != std::string::npos) {
+				norm = "days";
+			}
+			if (!norm.empty()) {
+				origin = norm + " since 1970-01-01 00:00:00";
+			}
+		}
+	}
+
 	if ((origin.find("seconds")) != std::string::npos) {
 		seconds = true;
 	} else if ((origin.find("minutes")) != std::string::npos) {
@@ -305,7 +359,7 @@ bool parse_ncdf_time(SpatRasterSource &s, const std::string unit, const std::str
 			}
 			days = true;
 		} 
-	
+
 		if (days) {
 			step = "days";
 			std::vector<int> ymd = getymd(origin);
@@ -434,10 +488,11 @@ std::vector<std::string> GetArrayNames(std::shared_ptr<GDALGroup> x, bool filter
 
 // Arrays usable as SpatRaster md sources: at least 2 dimensions.
 // Sorted so the most likely "main" data variable comes first:
-// first higher dimension count, then larger total cell count, then alphabetical
+// first higher dimension count, then larger total cell count. Arrays that tie
+// on those keys keep their driver-provided (time) order.
 static std::vector<std::string> md_arrays_usable_for_raster(
-		std::shared_ptr<GDALGroup> poRootGroup,
-		const std::vector<std::string> &candidates) {
+		std::shared_ptr<GDALGroup> poRootGroup, 	const std::vector<std::string> &candidates) {
+
 	struct NameDim {
 		std::string name;
 		size_t ndim;
@@ -469,8 +524,7 @@ static std::vector<std::string> md_arrays_usable_for_raster(
 	}
 	std::stable_sort(tmp.begin(), tmp.end(), [](const NameDim &a, const NameDim &b) {
 		if (a.ndim != b.ndim) return a.ndim > b.ndim;
-		if (a.ncell != b.ncell) return a.ncell > b.ncell;
-		return a.name < b.name;
+		return a.ncell > b.ncell;
 	});
 	std::vector<std::string> out;
 	out.reserve(tmp.size());
@@ -481,11 +535,104 @@ static std::vector<std::string> md_arrays_usable_for_raster(
 }
 
 
+// HDF4 does not attach indexing variables to the dimensions of an ResolveMDArray. 
+// Get it from the group that owns the dimensions
+static std::shared_ptr<GDALMDArray> md_get_indexing_var(
+		const std::shared_ptr<GDALDimension> &dim,
+		const std::shared_ptr<GDALGroup> &root) {
+
+	auto indvar = dim->GetIndexingVariable();
+	if (indvar || (root == nullptr)) {
+		return indvar;
+	}
+	const std::string full = dim->GetFullName();
+	const std::string name = dim->GetName();
+	std::shared_ptr<GDALGroup> g = root;
+	if (full.size() > (name.size() + 1)) {
+		// the path of the owning group: the full name without the
+		// leading "/" and without the trailing "/<name>"
+		std::string path = full.substr(0, full.size() - name.size() - 1);
+		size_t p0 = 1;
+		while ((g != nullptr) && (p0 < path.size())) {
+			size_t p1 = path.find('/', p0);
+			if (p1 == std::string::npos) p1 = path.size();
+			g = g->OpenGroup(path.substr(p0, p1-p0));
+			p0 = p1 + 1;
+		}
+	}
+	if (g == nullptr) {
+		return nullptr;
+	}
+	for (const auto &gd : g->GetDimensions()) {
+		if (gd->GetName() == name) {
+			return gd->GetIndexingVariable();
+		}
+	}
+	return nullptr;
+}
+
+
+// GRIB md: 2D slices expose validity_time; 3D chunks expose a temporal dim.
+static int64_t md_array_start_time(
+		std::shared_ptr<GDALGroup> poRootGroup,
+		const std::string &array_name) {
+
+	std::string startgroup = "";
+	auto poVar = poRootGroup->ResolveMDArray(array_name.c_str(), startgroup, nullptr);
+	if (!poVar) {
+		return INT64_MAX;
+	}
+	auto vt = poVar->GetAttribute("validity_time");
+	if (vt) {
+		return static_cast<int64_t>(vt->ReadAsDouble());
+	}
+	for (const auto &poDim : poVar->GetDimensions()) {
+		std::string dtype = poDim->GetType();
+		if (dtype != "TEMPORAL" && !md_is_time_dim_name(poDim->GetName())) {
+			continue;
+		}
+		auto ind = md_get_indexing_var(poDim, poRootGroup);
+		if (!ind) {
+			continue;
+		}
+		double v = 0;
+		std::vector<GUInt64> st(1, 0);
+		std::vector<size_t> count = {1};
+		auto reader = ind->GetUnscaled();
+		if (!reader) {
+			reader = ind;
+		}
+		if (reader->Read(st.data(), count.data(), nullptr, nullptr,
+				GDALExtendedDataType::Create(GDT_Float64), &v)) {
+			return static_cast<int64_t>(v);
+		}
+	}
+	return INT64_MAX;
+}
+
+
+// HDF-EOS (and similar) often leave MDArray::GetSpatialRef() empty; the CRS
+// is in the classic driver's StructMetadata. Probe once per file (#2068, #2162).
+static std::string md_classic_crs_wkt(const std::string &fname) {
+	std::string wkt;
+	gdal_capture_messages_begin();
+	try {
+		std::vector<std::string> ops;
+		std::vector<std::string> empty_dom;
+		SpatRasterStack rstack(fname, {0}, true, ops, true, true, empty_dom);
+		wkt = rstack.getSRS("wkt");
+	} catch(...) {}
+	gdal_capture_messages_end(false);
+	return wkt;
+}
+
+
 static bool md_fill_source_from_marray(
 	SpatRaster &parent,
 	const std::string &fname,
 	const std::string &array_request_name,
 	std::shared_ptr<GDALMDArray> poVar,
+	std::shared_ptr<GDALGroup> poRootGroup,
 	std::vector<std::string> options,
 	bool noflip,
 	bool guessCRS,
@@ -511,8 +658,9 @@ static bool md_fill_source_from_marray(
 	size_t ndim = dimData.size();
 	dimvals.reserve(ndim);
 	dimcalendar.reserve(ndim);
-	
-	
+
+
+	std::vector<std::shared_ptr<GDALMDArray>> indvars(ndim);
     for (size_t i=0; i<ndim; i++) {
 		size_t n = dimData[i]->GetSize();
         dimcount.push_back(n);
@@ -522,8 +670,9 @@ static bool md_fill_source_from_marray(
 		std::vector<size_t> count = {n};
 		dimvals.push_back(std::vector<double>(n));
 
-		const auto indvar = dimData[i]->GetIndexingVariable();
-		
+		indvars[i] = md_get_indexing_var(dimData[i], poRootGroup);
+		const auto &indvar = indvars[i];
+
 		if (indvar == NULL) {
 			dimvals[i].resize(n);
 			std::iota(dimvals[i].begin(), dimvals[i].end(), 1);			
@@ -551,7 +700,7 @@ static bool md_fill_source_from_marray(
 	if (!s.source_name.empty() && (s.source_name.front() == '/')) {
 		s.source_name.erase(0, 1); 
     }
-	
+
 	auto lname = poVar->GetAttribute("long_name");
 	if (lname) s.source_name_long = lname->ReadAsString();
 
@@ -563,8 +712,8 @@ static bool md_fill_source_from_marray(
 		s.m_missing_value = poVar->GetNoDataValueAsDouble(&s.m_hasNA);
 	}
 
-	int ix = md_find_col_dim(dimnames);
-	int iy = md_find_row_dim(dimnames);
+	int ix = md_find_col_dim(dimnames, dimData);
+	int iy = md_find_row_dim(dimnames, dimData);
 	if (ix < 0 || iy < 0 || ix == iy) {
 		ix = (int) ndim - 1;
 		iy = (int) ndim - 2;
@@ -584,9 +733,12 @@ static bool md_fill_source_from_marray(
 		}
 		if (extra.size() == 1) {
 			size_t e = extra[0];
-			if (md_is_time_dim_name(dimnames[e]) || !dimcalendar[e].empty()) {
+			std::string dtype = lower_case(dimData[e]->GetType());
+			if (md_is_time_dim_name(dimnames[e]) || !dimcalendar[e].empty() || dtype == "temporal") {
 				it = (int) e;
-			} else {
+			} else if (md_is_vertical_dim_name(dimnames[e])) {
+				// only treat as depth when the name is clearly vertical;
+				// HDF-EOS class / category axes stay as plain layers (MCD12C1)
 				iz = (int) e;
 			}
 			dimmap_extras.push_back(e);
@@ -601,7 +753,8 @@ static bool md_fill_source_from_marray(
 		} else {
 			dimmap_extras = extra;
 			for (size_t e : extra) {
-				if (it < 0 && (md_is_time_dim_name(dimnames[e]) || !dimcalendar[e].empty())) {
+				std::string dtype = lower_case(dimData[e]->GetType());
+				if (it < 0 && (md_is_time_dim_name(dimnames[e]) || !dimcalendar[e].empty() || dtype == "temporal")) {
 					it = (int) e;
 				}
 			}
@@ -635,7 +788,7 @@ static bool md_fill_source_from_marray(
 		if (dimvals[ii].size() <= 2) {
 			continue;
 		}
-		const auto indvar2 = dimData[ii]->GetIndexingVariable();
+		const auto &indvar2 = indvars[ii];
 		if (indvar2 == NULL) {
 			continue;
 		}
@@ -661,7 +814,7 @@ static bool md_fill_source_from_marray(
 	res = (end - start) / (s.nrow-1);
 	e.ymax = end + 0.5 * res;
 	e.ymin = start - 0.5 * res;
-	
+
 	s.flipped = false;
 	if ((!noflip) && (e.ymin > e.ymax)) {
 		std::swap(e.ymin, e.ymax);
@@ -728,7 +881,19 @@ static bool md_fill_source_from_marray(
 	if (it >= 0 && pos_it != (size_t) -1 && !time_coord.empty()) {
 		for (size_t L = 0; L < s.nlyr; L++) {
 			md_layer_to_indices(L, extra_sizes, idx);
-			s.time[L] = time_coord[idx[pos_it]];
+			s.setTime(L, time_coord[idx[pos_it]]);
+		}
+	} else if (it < 0 && s.nlyr > 0) {
+		// GRIB multidim: leftover 2D slices carry validity_time, not a TIME dim (#2160)
+		auto vt = poVar->GetAttribute("validity_time");
+		if (vt) {
+			int64_t t = static_cast<int64_t>(vt->ReadAsDouble());
+			if (s.time.size() != s.nlyr) {
+				s.time.assign(s.nlyr, NA_TIME);
+			}
+			s.setTime(0, t);
+			s.timestep = "seconds";
+			s.hasTime = true;
 		}
 	}
 	if (iz >= 0 && pos_iz != (size_t) -1) {
@@ -737,10 +902,10 @@ static bool md_fill_source_from_marray(
 		const std::vector<double> &dvz = dimvals[iz];
 		for (size_t L = 0; L < s.nlyr; L++) {
 			md_layer_to_indices(L, extra_sizes, idx);
-			s.depth[L] = dvz[idx[pos_iz]];
+			s.setDepth(L, dvz[idx[pos_iz]]);
 		}
 	}
-	
+
 	for (size_t i = 0; i < dimmap.size(); i++) {
 		s.m_dims.push_back((size_t) dimmap[i]);
 	}
@@ -760,18 +925,17 @@ static bool md_fill_source_from_marray(
 		CPLFree(cp);
 	} 
 	if (wkt.empty()) {
-		// temporary work-around for https://github.com/rspatial/terra/issues/2068
-		std::vector<std::string> ops;
-		try {
-			std::vector<std::string> empty_dom;
-			SpatRasterStack rstack(fname, {0}, true, ops, true, true, empty_dom);
-			wkt = rstack.getSRS("wkt");
-		} catch(...) {}
-	} 
-	
-	if (guessCRS && wkt.empty()) {
-		
-		if (s.extent.xmin >= -181 && s.extent.xmax <= 361 && s.extent.ymin >= -91 && s.extent.ymax <= 91) {
+		bool lonlat_extent = (s.extent.xmin >= -181 && s.extent.xmax <= 361 &&
+		                      s.extent.ymin >= -91 && s.extent.ymax <= 91);
+		bool geographic_xy =
+			(md_is_lon_unit(dimunits[ix]) && md_is_lat_unit(dimunits[iy])) ||
+			(md_is_lon_name(dimnames[ix]) && md_is_lat_name(dimnames[iy]));
+		if (geographic_xy && lonlat_extent) {
+			// CF lon/lat coordinates -> CRS84. The classic driver does the same,
+			// so this is a derived CRS, not a guess: assigned without a warning.
+			wkt = "OGC:CRS84";
+			s.parameters_changed = true;
+		} else if (guessCRS && lonlat_extent) {
 			wkt = "OGC:CRS84";
 			s.parameters_changed = true;
 			parent.addWarning("guessed crs");
@@ -780,7 +944,80 @@ static bool md_fill_source_from_marray(
 	std::string msg = "";
 	if (!s.srs.set({wkt}, msg)) {
 		parent.addWarning(msg);
-	}	
+	}
+
+	// Swath / curvilinear: CF "coordinates" (or sibling lon/lat arrays) → GEOLOCATION
+	// so has.geoloc / project work when the classic netCDF driver is unavailable
+	// (e.g. /vsicurl/ on Windows) (#1175).
+	{
+		std::string lon_tok, lat_tok;
+		auto ac = poVar->GetAttribute("coordinates");
+		if (ac) {
+			std::istringstream iss(ac->ReadAsString());
+			std::string tok;
+			while (iss >> tok) {
+				size_t slash = tok.find_last_of('/');
+				std::string base = (slash == std::string::npos) ? tok : tok.substr(slash + 1);
+				if (md_is_lon_name(base)) lon_tok = tok;
+				if (md_is_lat_name(base)) lat_tok = tok;
+			}
+		}
+		// Default sibling names are a netCDF swath convention (#1175).
+		// Do not ResolveMDArray("longitude") on every HDF-EOS SDS (#2162).
+		if (lon_tok.empty() || lat_tok.empty()) {
+			std::string fl = fname;
+			for (char &c : fl) {
+				c = (char)tolower((unsigned char)c);
+			}
+			bool maybe_nc = (fl.find("netcdf:") != std::string::npos) ||
+				(fl.size() >= 3 && fl.compare(fl.size()-3, 3, ".nc") == 0) ||
+				(fl.size() >= 4 && (fl.compare(fl.size()-4, 4, ".nc4") == 0 ||
+				                     fl.compare(fl.size()-4, 4, ".cdf") == 0));
+			if (maybe_nc) {
+				if (lon_tok.empty()) lon_tok = "longitude";
+				if (lat_tok.empty()) lat_tok = "latitude";
+			}
+		}
+
+		std::string group;
+		{
+			std::string full = poVar->GetFullName();
+			size_t slash = full.find_last_of('/');
+			if (slash != std::string::npos) group = full.substr(0, slash);
+		}
+		auto resolve_coord = [&](const std::string &nm) -> std::shared_ptr<GDALMDArray> {
+			std::string start;
+			auto a = poRootGroup->ResolveMDArray(nm.c_str(), start, nullptr);
+			if (a) return a;
+			if (!nm.empty() && nm[0] != '/' && !group.empty()) {
+				std::string p = group + "/" + nm;
+				a = poRootGroup->ResolveMDArray(p.c_str(), start, nullptr);
+			}
+			return a;
+		};
+		if (!lon_tok.empty() && !lat_tok.empty()) {
+			auto lon = resolve_coord(lon_tok);
+			auto lat = resolve_coord(lat_tok);
+			if (lon && lat && lon->GetDimensions().size() >= 2 && lat->GetDimensions().size() >= 2) {
+				s.has_geolocation = true;
+				if (s.geoloc_srs.empty()) {
+					s.geoloc_srs = "EPSG:4326";
+				}
+				std::string lx = lon->GetFullName();
+				std::string ly = lat->GetFullName();
+				s.geoloc_x = std::string("NETCDF:\"") + fname + "\":" + lx;
+				s.geoloc_y = std::string("NETCDF:\"") + fname + "\":" + ly;
+				if (s.srs.is_empty()) {
+					std::string emsg;
+					if (s.srs.set(s.geoloc_srs, emsg)) {
+						s.parameters_changed = true;
+					} else if (!emsg.empty()) {
+						parent.addWarning(emsg);
+					}
+				}
+			}
+		}
+	}
 
 	bool app_so = true;
 	size_t opsz = options.size();
@@ -804,7 +1041,7 @@ static bool md_fill_source_from_marray(
 			s.scale = std::vector<double>(s.nlyr, scale);
 		}
 	}
-	
+
 	s.rotated = false;
 	s.memory = false;
 	s.filename = fname;
@@ -830,22 +1067,27 @@ static bool md_fill_source_from_marray(
 			md_layer_to_indices(L, extra_sizes, idx);
 			std::string nm = arname;
 			bool name_has_dim = false;
-			bool skipped_time_for_name = false;
+			bool skipped_for_name = false;
 			for (size_t j = 0; j < dimmap_extras.size(); j++) {
-				if (it >= 0 && (int) dimmap_extras[j] == it) {
-					skipped_time_for_name = true;
+				int d = (int) dimmap_extras[j];
+				if (d == it) {
+					// time lives in time(); omit from layer label
+					skipped_for_name = true;
 					continue;
 				}
-				name_has_dim = true;
-				nm += "_" + dimnames[dimmap_extras[j]] + "="
-					+ double_to_string(dimvals[dimmap_extras[j]][idx[j]]);
+				if (d == iz) {
+					name_has_dim = true;
+					nm += "_" + dimnames[dimmap_extras[j]] + "="
+						+ double_to_string(dimvals[dimmap_extras[j]][idx[j]]);
+					continue;
+				}
+				// Anonymous layer axis (e.g. Num_IGBP_Classes): number below
+				skipped_for_name = true;
 			}
 			if (!name_has_dim && (s.nlyr > 1)) {
-				// Only non-spatial dim is time (omitted from label): number layers
 				nm += "_" + std::to_string(L + 1);
-			} else if (skipped_time_for_name && (s.nlyr > 1)) {
-				// Time is in metadata, not in the label; add 1-based time step so
-				// names match rast(, md=FALSE), e.g. t2m_expver=1_1 .. _24
+			} else if (skipped_for_name && (s.nlyr > 1)) {
+				// Time / class index omitted from label; keep layers distinct
 				size_t tidx = (pos_it != (size_t) -1) ? (idx[pos_it] + 1) : (L + 1);
 				nm += "_" + std::to_string(tidx);
 			}
@@ -866,6 +1108,7 @@ bool SpatRaster::constructFromFileMulti(std::string fname, std::vector<int> subd
 //	(void) dims;
 //	(void) domains;
 
+	TerraGDALErrorHandlerScope gdal_err_scope;
 
 	char ** drvs = NULL;
 	for (size_t i=0; i<drivers.size(); i++) {
@@ -926,6 +1169,18 @@ bool SpatRaster::constructFromFileMulti(std::string fname, std::vector<int> subd
 	}
 
 	const bool single_var = (arrays_to_use.size() == 1);
+	if (!single_var && arrays_to_use.size() > 1) {
+		std::stable_sort(arrays_to_use.begin(), arrays_to_use.end(),
+			[&](const std::string &a, const std::string &b) {
+				int64_t ta = md_array_start_time(poRootGroup, a);
+				int64_t tb = md_array_start_time(poRootGroup, b);
+				if (ta == tb) {
+					return a < b;
+				}
+				return ta < tb;
+			});
+	}
+
 	SpatOptions opt;
 	size_t nvar_ok = 0;
 	size_t max_nlyr_var = 0;
@@ -958,7 +1213,7 @@ bool SpatRaster::constructFromFileMulti(std::string fname, std::vector<int> subd
 		SpatRasterSource s;
 		s.open_drivers = drivers;
 		std::vector<std::string> opts_copy = options;
-		if (!md_fill_source_from_marray(*this, fname, arrays_to_use[ai], poVar, std::move(opts_copy), noflip, guessCRS, single_var, s)) {
+		if (!md_fill_source_from_marray(*this, fname, arrays_to_use[ai], poVar, poRootGroup, std::move(opts_copy), noflip, guessCRS, single_var, s)) {
 			if (single_var) {
 				return false;
 			}
@@ -990,60 +1245,84 @@ bool SpatRaster::constructFromFileMulti(std::string fname, std::vector<int> subd
 		return false;
 	}
 
-/*
-		if (arrays_to_use.size() > 1 && max_nlyr_var > 1) {
-			std::string w = "combined " + std::to_string(nvar_ok) + " variables";
-			w += " (";
-			size_t nshow = std::min(source.size(), (size_t) 6);
-			for (size_t i = 0; i < nshow; i++) {
-				if (i > 0) {
-					w += ", ";
-				}
-				w += source[i].source_name.empty() ? source[i].m_arrayname : source[i].source_name;
-			}
-			if (source.size() > 5) {
-				w += ", ...)";
-			} else {
-				w += ")";
-			}
-			addWarning(w);		
+	bool need_crs = false;
+	for (size_t i=0; i<source.size(); i++) {
+		if (source[i].srs.is_empty()) {
+			need_crs = true;
+			break;
+		}
 	}
-*/	
+	if (need_crs) {
+		std::string wkt = md_classic_crs_wkt(fname);
+		if (!wkt.empty()) {
+			for (size_t i=0; i<source.size(); i++) {
+				if (!source[i].srs.is_empty()) continue;
+				std::string msg;
+				if (!source[i].srs.set({wkt}, msg) && !msg.empty()) {
+					addWarning(msg);
+				}
+			}
+		}
+	}
+
 	return true;
 }
 
 
 bool SpatRaster::readStartMulti(size_t src) {
 
-	char ** drvs = NULL;
+	// Build a cache key from filename+drivers to only reopen the multidim
+	// dataset when the file (or driver set) actually changes. This is critical
+	// if the multidim driver splits a single file into many arrays (seen with GRIB)
+	std::string key = source[src].filename;
+	key.push_back('\x1f');
 	for (size_t i=0; i<source[src].open_drivers.size(); i++) {
-		drvs = CSLAddString(drvs, source[src].open_drivers[i].c_str());
+		key += source[src].open_drivers[i];
+		key.push_back('\x1f');
 	}
 
-    auto poDataset = std::unique_ptr<GDALDataset>(GDALDataset::Open(source[src].filename.c_str(), GDAL_OF_MULTIDIM_RASTER, drvs));
-    if( !poDataset ) {
-		setError("not a good dataset");
-        return false;
-    }
+	std::shared_ptr<GDALGroup> poRootGroup;
+	if (m_mdCacheRoot && (m_mdCacheKey == key)) {
+		poRootGroup = m_mdCacheRoot;
+	} else {
+		m_mdCacheRoot.reset();
+		m_mdCacheDataset.reset();
+		m_mdCacheKey.clear();
 
-
-	std::shared_ptr<GDALGroup> poRootGroup = poDataset->GetRootGroup();
-    if( !poRootGroup ) {
-		setError("no roots");
-		return false;
-    }
+		char ** drvs = NULL;
+		for (size_t i=0; i<source[src].open_drivers.size(); i++) {
+			drvs = CSLAddString(drvs, source[src].open_drivers[i].c_str());
+		}
+		GDALDataset *rawDs = GDALDataset::Open(source[src].filename.c_str(), GDAL_OF_MULTIDIM_RASTER, drvs);
+		CSLDestroy(drvs);
+		if (!rawDs) {
+			setError("not a good dataset");
+			return false;
+		}
+		// Use GDALClose (not delete) so GDAL's Reference()/Dereference() ref
+		// counting stays consistent when other shared_ptrs (e.g. the root
+		// group) hold references to this dataset.
+		std::shared_ptr<GDALDataset> poDataset(rawDs, [](GDALDataset *p){ if (p) GDALClose(p); });
+		poRootGroup = poDataset->GetRootGroup();
+		if (!poRootGroup) {
+			setError("no roots");
+			return false;
+		}
+		m_mdCacheDataset = std::move(poDataset);
+		m_mdCacheRoot = poRootGroup;
+		m_mdCacheKey = key;
+	}
 
 	std::string startgroup="";
 	auto poVar = poRootGroup->ResolveMDArray(source[src].m_arrayname.c_str(), startgroup, nullptr);
 
-//    auto poVar = poRootGroup->OpenMDArray(source[src].m_arrayname.c_str());
     if( !poVar )   {
 		setError("cannot find: " + source[src].m_arrayname);
 		return false;
     }
 
 
-	if (source[src].has_scale_offset[0]) {
+	if (source[src].getHasScaleOffset(0)) {
 		source[src].m_array = poVar->GetUnscaled();
 	} else {
 		source[src].m_array = poVar;
@@ -1053,10 +1332,16 @@ bool SpatRaster::readStartMulti(size_t src) {
 }
 
 
+void SpatRaster::flushMultidimCache() {
+	m_mdCacheRoot.reset();
+	m_mdCacheDataset.reset();
+	m_mdCacheKey.clear();
+}
+
+
 bool SpatRaster::readStopMulti(size_t src) {
-//	Rcpp::Rcout << "readStopMulti\n";
 	source[src].open_read = false;
-	source[0].m_array.reset();
+	source[src].m_array.reset();
 	return true;
 }
 
@@ -1087,8 +1372,28 @@ bool SpatRaster::open_gdal_multidim(GDALDatasetH &hDS, size_t src) {
 		root->ResolveMDArray(source[src].m_arrayname.c_str(), startgroup, nullptr);
 	if (!arr) return false;
 
+#if GDAL_VERSION_NUM >= 3080000
+	// The 3-argument overload was added in GDAL 3.8
 	GDALDataset *cds = arr->AsClassicDataset(source[src].m_dims[0], source[src].m_dims[1], root);
+#else
+	GDALDataset *cds = arr->AsClassicDataset(source[src].m_dims[0], source[src].m_dims[1]);
+#endif
 	if (cds == NULL) return false;
+
+	// Attach classic GEOLOCATION so warp/project can use lon/lat arrays (#1175).
+	if (source[src].has_geolocation && !source[src].geoloc_x.empty() && !source[src].geoloc_y.empty()) {
+		const char *srs = source[src].geoloc_srs.empty() ? "EPSG:4326" : source[src].geoloc_srs.c_str();
+		GDALSetMetadataItem(cds, "SRS", srs, "GEOLOCATION");
+		GDALSetMetadataItem(cds, "X_DATASET", source[src].geoloc_x.c_str(), "GEOLOCATION");
+		GDALSetMetadataItem(cds, "Y_DATASET", source[src].geoloc_y.c_str(), "GEOLOCATION");
+		GDALSetMetadataItem(cds, "X_BAND", "1", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "Y_BAND", "1", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "PIXEL_OFFSET", "0", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "PIXEL_STEP", "1", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "LINE_OFFSET", "0", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "LINE_STEP", "1", "GEOLOCATION");
+		GDALSetMetadataItem(cds, "GEOREFERENCING_CONVENTION", "PIXEL_CENTER", "GEOLOCATION");
+	}
 
 	hDS = (GDALDatasetH) cds;
 	return true;
@@ -1186,8 +1491,7 @@ bool SpatRaster::readChunkMulti(std::vector<double> &data, size_t src, size_t ro
 }
 
 bool SpatRaster::readRowColMulti(size_t src, std::vector<std::vector<double>> &out, size_t outstart, std::vector<int64_t> &rows, const std::vector<int64_t> &cols) {
-	
-//	Rcpp::Rcout << "readRowColMulti " << src << "\n";
+
 	if (!readStartMulti(src)) {
 		return false;
 	}
@@ -1196,115 +1500,180 @@ bool SpatRaster::readRowColMulti(size_t src, std::vector<std::vector<double>> &o
 
 	out.resize(outstart + nl);
 	for (size_t i = outstart; i < outstart + nl; i++) {
-		out[i].clear();
-		out[i].reserve(n);
+		out[i].assign(n, NAN);
 	}
 
-	std::vector<GUInt64> offset(source[src].m_ndims, 0);
-
-	size_t ndim = source[src].m_dims.size();
-	std::vector<size_t> count(source[src].m_ndims, 1);
-
+	const size_t ndims = source[src].m_ndims;
+	const size_t ndim = source[src].m_dims.size();
+	const size_t coldim = source[src].m_dims[0];
 	const size_t rowdim = source[src].m_dims[1];
-	std::vector<size_t> extra_sizes;
-	for (size_t j = 2; j < ndim; j++) {
-		extra_sizes.push_back(source[src].m_size[source[src].m_dims[j]]);
+
+	// read the smallest contiguous non spatial dimensions
+	std::vector<size_t> count(ndims, 1);
+	std::vector<size_t> extra_sizes, extra_off;
+	size_t prod_extra = 1;
+	{
+		std::vector<size_t> idx;
+		for (size_t j = 2; j < ndim; j++) {
+			extra_sizes.push_back(source[src].m_size[source[src].m_dims[j]]);
+		}
+		std::vector<size_t> lo(extra_sizes.size(), SIZE_MAX), hi(extra_sizes.size(), 0);
+		for (size_t j = 0; j < nl; j++) {
+			md_layer_to_indices(source[src].layers[j], extra_sizes, idx);
+			for (size_t e = 0; e < idx.size(); e++) {
+				lo[e] = std::min(lo[e], idx[e]);
+				hi[e] = std::max(hi[e], idx[e]);
+			}
+		}
+		for (size_t j = 2; j < ndim; j++) {
+			size_t e = j - 2;
+			size_t gd = source[src].m_dims[j];
+			count[gd] = hi[e] - lo[e] + 1;
+			extra_off.push_back(lo[e]);
+			prod_extra *= count[gd];
+		}
 	}
-	std::vector<size_t> idx;
+
+	// array (file) row/col for each point; out-of-range points remain NAN
+	const int64_t nr1 = (int64_t) nrow() - 1;
+	const int64_t nc1 = (int64_t) ncol() - 1;
+	std::vector<size_t> frow(n), fcol(n);
+	std::vector<size_t> pts;
+	pts.reserve(n);
+	for (size_t p = 0; p < n; p++) {
+		if ((rows[p] < 0) || (rows[p] > nr1) || (cols[p] < 0) || (cols[p] > nc1)) {
+			continue;
+		}
+		frow[p] = source[src].flipped ? (size_t) rows[p] : (size_t) (nr1 - rows[p]);
+		fcol[p] = (size_t) cols[p];
+		pts.push_back(p);
+	}
 
 	auto dt = GDALExtendedDataType::Create(GDT_Float64);
+	std::vector<GUInt64> offset(ndims, 0);
+	for (size_t j = 2; j < ndim; j++) {
+		offset[source[src].m_dims[j]] = extra_off[j-2];
+	}
+	std::vector<size_t> idx;
+	std::vector<double> buf;
+	bool readfail = false;
 
-	if (ndim > 2) {
-		for (size_t j = 2; j < ndim; j++) {
-			size_t gab = source[src].m_dims[j];
-			count[gab] = source[src].m_size[gab];
+	// read the region [r0..r1] x [c0..c1] (with the extra dimension slab)
+	// in a single Read, and assign the values for the np points in pp
+	auto read_region = [&](size_t r0, size_t r1, size_t c0, size_t c1,
+			const size_t *pp, size_t np) {
+		std::vector<size_t> cnt = count;
+		cnt[rowdim] = r1 - r0 + 1;
+		cnt[coldim] = c1 - c0 + 1;
+		offset[rowdim] = r0;
+		offset[coldim] = c0;
+		// strides of the in-memory Read result (dim 0 slowest, last dim fastest)
+		std::vector<size_t> stride(ndims);
+		size_t sz = 1;
+		for (size_t k = ndims; k > 0; k--) {
+			stride[k-1] = sz;
+			sz *= cnt[k-1];
 		}
-		std::vector<size_t> stride_all(source[src].m_ndims);
-		for (size_t k = 0; k < source[src].m_ndims; k++) {
-			size_t st = 1;
-			for (size_t m = k + 1; m < source[src].m_ndims; m++) {
-				st *= count[m];
-			}
-			stride_all[k] = st;
-		}
-		size_t prod = 1;
-		for (size_t j = 2; j < ndim; j++) {
-			prod *= count[source[src].m_dims[j]];
-		}
-		std::vector<double> buf(prod);
-		std::vector<size_t> layer_linear(nl);
+		// linear offset of each layer within one (row, col) position
+		std::vector<size_t> layer_linear(nl, 0);
 		for (size_t j = 0; j < nl; j++) {
-			layer_linear[j] = md_layer_to_read_linear(source[src].layers[j], extra_sizes,
-				source[src].m_dims, stride_all);
+			md_layer_to_indices(source[src].layers[j], extra_sizes, idx);
+			for (size_t e = 0; e < extra_sizes.size(); e++) {
+				layer_linear[j] += (idx[e] - extra_off[e]) * stride[source[src].m_dims[2 + e]];
+			}
 		}
-		for (size_t p = 0; p < n; p++) {
-			if (std::isnan(cols[p]) || std::isnan(rows[p])) {
-				for (size_t j = 0; j < nl; j++) {
-					out[outstart + j].push_back(NAN);
-				}
-				continue;
-			}
-			offset[source[src].m_dims[0]] = cols[p];
-			if (!source[src].flipped) {
-				offset[rowdim] = nrow() - rows[p] - 1;
-			} else {
-				offset[rowdim] = rows[p];
-			}
-			source[src].m_array->Read(&offset[0], &count[0], nullptr, NULL, dt, &buf[0], NULL, 0);
-			if (source[src].m_hasNA) {
-				std::replace(buf.begin(), buf.end(), source[src].m_missing_value, (double)NAN);
-			}
+		buf.resize(sz);
+		if (!source[src].m_array->Read(&offset[0], &cnt[0], nullptr, NULL, dt, &buf[0], NULL, 0)) {
+			readfail = true;
+			return;
+		}
+		if (source[src].m_hasNA) {
+			std::replace(buf.begin(), buf.end(), source[src].m_missing_value, (double)NAN);
+		}
+		for (size_t q = 0; q < np; q++) {
+			size_t p = pp[q];
+			size_t base = (frow[p] - r0) * stride[rowdim] + (fcol[p] - c0) * stride[coldim];
 			for (size_t j = 0; j < nl; j++) {
-				out[outstart + j].push_back(buf[layer_linear[j]]);
+				out[outstart + j][p] = buf[base + layer_linear[j]];
 			}
+		}
+	};
+
+	// Compressed files are decompressed one chunk at a time. 
+	// so group points by chunk for a single read (#2145)
+	size_t bx = 0, by = 0;
+	std::vector<GUInt64> bsz = source[src].m_array->GetBlockSize();
+	if (bsz.size() == ndims) {
+		by = (size_t) bsz[rowdim];
+		bx = (size_t) bsz[coldim];
+	}
+	// largest allowed region read (in doubles; 64M = 512MB)
+	const size_t maxbuf = 67108864;
+
+	if (((bx > 1) || (by > 1)) && (pts.size() > 1)) {
+		if (bx == 0) bx = source[src].m_size[coldim];
+		if (by == 0) by = source[src].m_size[rowdim];
+		size_t nchunkx = (source[src].m_size[coldim] + bx - 1) / bx;
+		auto chunkid = [&](size_t p) {
+			return (frow[p] / by) * nchunkx + fcol[p] / bx;
+		};
+		std::sort(pts.begin(), pts.end(), [&](size_t a, size_t b) {
+			return chunkid(a) < chunkid(b);
+		});
+		size_t g0 = 0;
+		while ((g0 < pts.size()) && (!readfail)) {
+			size_t cid = chunkid(pts[g0]);
+			size_t r0 = frow[pts[g0]], r1 = r0;
+			size_t c0 = fcol[pts[g0]], c1 = c0;
+			size_t g1 = g0 + 1;
+			while ((g1 < pts.size()) && (chunkid(pts[g1]) == cid)) {
+				size_t p = pts[g1];
+				r0 = std::min(r0, frow[p]); r1 = std::max(r1, frow[p]);
+				c0 = std::min(c0, fcol[p]); c1 = std::max(c1, fcol[p]);
+				g1++;
+			}
+			size_t region = (r1 - r0 + 1) * (c1 - c0 + 1) * prod_extra;
+			if (region <= maxbuf) {
+				read_region(r0, r1, c0, c1, &pts[g0], g1 - g0);
+			} else {
+				for (size_t g = g0; (g < g1) && (!readfail); g++) {
+					size_t p = pts[g];
+					read_region(frow[p], frow[p], fcol[p], fcol[p], &pts[g], 1);
+				}
+			}
+			g0 = g1;
 		}
 	} else {
-		if (source[src].in_order(true)) {
-			for (size_t j = 2; j < ndim; j++) {
-				size_t gd = source[src].m_dims[j];
-				count[gd] = source[src].m_size[gd];
+		// not chunked. A single read of the bounding box of all points is
+		// much faster than many small reads, unless the points are sparse 
+		bool dense = false;
+		size_t r0=0, r1=0, c0=0, c1=0;
+		if (pts.size() > 1) {
+			r0 = frow[pts[0]]; r1 = r0;
+			c0 = fcol[pts[0]]; c1 = c0;
+			for (size_t g = 1; g < pts.size(); g++) {
+				size_t p = pts[g];
+				r0 = std::min(r0, frow[p]); r1 = std::max(r1, frow[p]);
+				c0 = std::min(c0, fcol[p]); c1 = std::max(c1, fcol[p]);
 			}
-		} else {
-			for (size_t j = 2; j < ndim; j++) {
-				count[source[src].m_dims[j]] = 1;
-			}
+			size_t boxcells = (r1 - r0 + 1) * (c1 - c0 + 1);
+			dense = (boxcells <= (64 * pts.size())) && ((boxcells * prod_extra) <= maxbuf);
 		}
-		std::vector<double> v(nl, NAN);
-		for (size_t p = 0; p < n; p++) {
-			if (std::isnan(cols[p]) || std::isnan(rows[p])) {
-				for (size_t j = 0; j < nl; j++) {
-					out[outstart + j].push_back(NAN);
-				}
-				continue;
-			}
-			offset[source[src].m_dims[0]] = cols[p];
-			if (!source[src].flipped) {
-				offset[rowdim] = nrow() - rows[p] - 1;
-			} else {
-				offset[rowdim] = rows[p];
-			}
-
-			if (source[src].in_order(true)) {
-				source[src].m_array->Read(&offset[0], &count[0], nullptr, NULL, dt, &v[0], NULL, 0);
-			} else {
-				for (size_t j = 0; j < nl; j++) {
-					md_layer_to_indices(source[src].layers[j], extra_sizes, idx);
-					for (size_t e = 0; e < extra_sizes.size(); e++) {
-						offset[source[src].m_dims[2 + e]] = idx[e];
-					}
-					source[src].m_array->Read(&offset[0], &count[0], NULL, NULL, dt, &v[j], NULL, 0);
-				}
-			}
-			if (source[src].m_hasNA) {
-				std::replace(v.begin(), v.end(), source[src].m_missing_value, (double)NAN);
-			}
-			for (size_t j = 0; j < nl; j++) {
-				out[outstart + j].push_back(v[j]);
+		if (dense) {
+			read_region(r0, r1, c0, c1, &pts[0], pts.size());
+		} else {
+			for (size_t g = 0; (g < pts.size()) && (!readfail); g++) {
+				size_t p = pts[g];
+				read_region(frow[p], frow[p], fcol[p], fcol[p], &pts[g], 1);
 			}
 		}
 	}
 
-	readStopMulti(src);	
+	readStopMulti(src);
+	if (readfail) {
+		setError("cannot read values from " + source[src].filename);
+		return false;
+	}
 	return true;
 }
 
@@ -1340,7 +1709,7 @@ bool SpatRaster::writeStartMulti(SpatOptions &opt, const std::vector<std::string
 		}
 	}
 */
-	
+
     GDALDriver *poDriver;
     poDriver = GetGDALDriverManager()->GetDriverByName(driver.c_str());
 
@@ -1353,7 +1722,7 @@ bool SpatRaster::writeStartMulti(SpatOptions &opt, const std::vector<std::string
 	}
 
     auto rg = poDS->GetRootGroup();
-	
+
 	std::vector<std::shared_ptr<GDALDimension>> dim_ptrs;
 	auto dt = GDALExtendedDataType::Create(GDT_Float64);
 
@@ -1386,11 +1755,11 @@ bool SpatRaster::writeStartMulti(SpatOptions &opt, const std::vector<std::string
 	xFromCol(dvals);
 	count = {nx};
 	var->Write(start.data(), count.data(), nullptr, nullptr, dt, &dvals[0]); 
-	
+
 	std::string vname = source[0].source_name.empty() ? "array" : source[0].source_name;
-	
+
     var = rg->CreateMDArray(vname, dim_ptrs, GDALExtendedDataType::Create(GDT_Float64));
-	
+
 
 	std::string wkt = source[0].srs.wkt;
 	if (!wkt.empty()) {
@@ -1444,6 +1813,9 @@ bool SpatRaster::readStopMulti(size_t src) {
 	return false;
 }
 
+void SpatRaster::flushMultidimCache() {
+}
+
 bool SpatRaster::open_gdal_multidim(GDALDatasetH &hDS, size_t src) {
 	return false;
 }
@@ -1495,7 +1867,7 @@ void getSampleRowCol2(std::vector<int64_t> &oldrow, std::vector<int64_t> &oldcol
 	//double cstart = std::floor(0.5 * cf);
 	double rstart = 0.5 * rf;
 	double cstart = 0.5 * cf;
-	
+
 	std::vector<int64_t> xcol, xrow;
 	xcol.reserve(sncol);
 	for (size_t i =0; i<sncol; i++) {
@@ -1518,34 +1890,93 @@ void getSampleRowCol2(std::vector<int64_t> &oldrow, std::vector<int64_t> &oldcol
 
 std::vector<double> SpatRaster::readSampleMulti(size_t src, size_t srows, size_t scols, bool overview) {
 	(void) overview;
-	std::vector<int64_t> colnr, rownr;
-	getSampleRowCol2(rownr, colnr, nrow(), ncol(), srows, scols);
-	const size_t n = rownr.size();
+
 	const size_t nl = source[src].layers.size();
-	std::vector<std::vector<double>> out(nl);
-	if (!readRowColMulti(src, out, 0, rownr, colnr)) {
+	const size_t NR = nrow();
+	const size_t NC = ncol();
+	if (nl == 0 || NR == 0 || NC == 0 || srows == 0 || scols == 0) {
 		return std::vector<double>();
 	}
-	if (hasError()) {
-		return std::vector<double>();
+
+	// Regularly-spaced sample row / column indices (same scheme as getSampleRowCol2).
+	const double rf = NR / (double) srows;
+	const double cf = NC / (double) scols;
+	std::vector<size_t> samp_col(scols);
+	for (size_t j = 0; j < scols; j++) {
+		size_t c = (size_t) (j * cf + 0.5 * cf);
+		samp_col[j] = (c < NC) ? c : (NC - 1);
 	}
-	// Same band layout as readGDALsample / readChunkGDAL: layer-major (cells, then next layer).
+	std::vector<size_t> samp_row(srows);
+	for (size_t i = 0; i < srows; i++) {
+		size_t r = (size_t) (i * rf + 0.5 * rf);
+		samp_row[i] = (r < NR) ? r : (NR - 1);
+	}
+
+	const size_t n = srows * scols;
+	// Layer-major output, matching readGDALsample / readChunkGDAL.
 	std::vector<double> ret(n * nl);
-	for (size_t lyr = 0; lyr < nl; lyr++) {
-		if (out[lyr].size() != n) {
-			setError("internal error in readSampleMulti: unexpected sample size");
+
+	if (!readStartMulti(src)) {
+		return std::vector<double>();
+	}
+
+	// Read the whole array in one pass if that matches the need and file is small
+	SpatOptions sopt;
+	const bool fits = canProcessInMemory(sopt);
+	const bool tall_sparse_sample = (NR >= 2048) && (srows * 4 < NR);
+	if (fits && !tall_sparse_sample) {
+		std::vector<double> block;
+		readChunkMulti(block, src, 0, NR, 0, NC); // nl * NR * NC, layer-major
+		readStopMulti(src);
+		const size_t cells = NR * NC;
+		if (hasError() || block.size() != cells * nl) {
+			if (!hasError()) {
+				setError("internal error in readSampleMulti: unexpected block size");
+			}
 			return std::vector<double>();
 		}
-		double *dest = ret.data() + lyr * n;
-		std::copy(out[lyr].begin(), out[lyr].end(), dest);
+		for (size_t lyr = 0; lyr < nl; lyr++) {
+			const double *layer = block.data() + lyr * cells;
+			double *dest = ret.data() + lyr * n;
+			for (size_t i = 0; i < srows; i++) {
+				const double *layrow = layer + samp_row[i] * NC;
+				double *drow = dest + i * scols;
+				for (size_t j = 0; j < scols; j++) {
+					drow[j] = layrow[samp_col[j]];
+				}
+			}
+		}
+		return ret;
 	}
+
+	// one (partial) row at a time.
+	std::vector<double> rowbuf;
+	for (size_t i = 0; i < srows; i++) {
+		rowbuf.clear();
+		readChunkMulti(rowbuf, src, samp_row[i], 1, 0, NC); // appends nl * NC
+		if (hasError() || rowbuf.size() != nl * NC) {
+			readStopMulti(src);
+			if (!hasError()) {
+				setError("internal error in readSampleMulti: unexpected row size");
+			}
+			return std::vector<double>();
+		}
+		for (size_t lyr = 0; lyr < nl; lyr++) {
+			const double *rowlyr = rowbuf.data() + lyr * NC;
+			double *dest = ret.data() + lyr * n + i * scols;
+			for (size_t j = 0; j < scols; j++) {
+				dest[j] = rowlyr[samp_col[j]];
+			}
+		}
+	}
+	readStopMulti(src);
 	return ret;
 }
 
 
 SpatRaster SpatRaster::writeRasterM(SpatOptions &opt) {
 	SpatRaster out;
-	
+
 	std::vector<std::string> fnames = opt.get_filenames();
 
 	if (!writeStartMulti(opt, {""})) {
@@ -1561,7 +1992,7 @@ SpatRaster SpatRaster::writeRasterM(SpatOptions &opt) {
 
 	std::vector<std::string> empty;
 	std::vector<int> dims = {-1};
-	
+
 	out.constructFromFileMulti(fnames[0], {0}, empty, empty, empty, dims, false, false, {""});
 	return out;
 }
@@ -1584,7 +2015,7 @@ std::vector<std::vector<std::string>> SpatRaster::dim_names() {
 		}
 	}
 	return(out);
-	
+
 }
 
 std::vector<std::vector<size_t>> SpatRaster::dim_order() {

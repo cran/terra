@@ -68,7 +68,7 @@ Rcpp::List getDataFrame(SpatDataFrame* v) {
 	long longNA = NA<long>::value;
 	std::string stringNA = v->NAS;
 	SpatTime_t timeNA = NA<SpatTime_t>::value;
-	
+
 	std::vector<std::string> nms = v->names;
 	std::vector<size_t> itype = v->itype;
 	for (size_t i=0; i < n; i++) {
@@ -152,13 +152,25 @@ Rcpp::List getRasterAttributes(SpatRaster* x) {
 Rcpp::DataFrame get_geometryDF(SpatVector* v) {
 	SpatDataFrame df = v->getGeometryDF();
 
-	Rcpp::DataFrame out = Rcpp::DataFrame::create(
+	Rcpp::DataFrame out;
+	if (v->has_z()) {
+		out = Rcpp::DataFrame::create(
+			Rcpp::Named("id") = df.iv[0],
+			Rcpp::Named("part") = df.iv[1],
+			Rcpp::Named("x") = df.dv[0],
+			Rcpp::Named("y") = df.dv[1],
+			Rcpp::Named("hole") = df.iv[2],
+			Rcpp::Named("z") = df.dv[2]
+		);
+	} else {
+		out = Rcpp::DataFrame::create(
 			Rcpp::Named("id") = df.iv[0],
 			Rcpp::Named("part") = df.iv[1],
 			Rcpp::Named("x") = df.dv[0],
 			Rcpp::Named("y") = df.dv[1],
 			Rcpp::Named("hole") = df.iv[2]
-	);
+		);
+	}
 	return out;
 }
 
@@ -220,7 +232,7 @@ RCPP_MODULE(spat){
 
 /*
 	class_<SpatVector2>("SpatVector2")
-	
+
 		.constructor()
 		.field("x", &SpatVector2::X)
 		.field("y", &SpatVector2::Y)
@@ -488,7 +500,7 @@ RCPP_MODULE(spat){
 
 		.method("addWKB", &addWKB)
 //		.method("pointInPolygon", &SpatVector::pointInPolygon)
-		
+
 		.method("deepcopy", &SpatVector::deepCopy)
 		.method("show", &SpatVector::show)
 		.method("wkt", &SpatVector::wkt)
@@ -570,6 +582,8 @@ RCPP_MODULE(spat){
 		.method("distance_self", (std::vector<double> (SpatVector::*)(bool, std::string, const std::string, bool, SpatOptions&))( &SpatVector::distance))
 		.method("distance_other", (std::vector<double> (SpatVector::*)(SpatVector, bool, std::string, const std::string, bool, SpatOptions&))( &SpatVector::distance))
 		.method("point_distance", &SpatVector::pointdistance)
+		.method("furthest_distance", &SpatVector::furthest_distance)
+		.method("snap_to", &SpatVector::snap_to)
 
 //		.method("geosdist_self", (std::vector<double> (SpatVector::*)(bool, std::string))( &SpatVector::geos_distance))
 //		.method("geosdist_other", (std::vector<double> (SpatVector::*)(SpatVector, bool, std::string))( &SpatVector::geos_distance))
@@ -589,9 +603,11 @@ RCPP_MODULE(spat){
 		.method("project_xy", &SpatVector::project_xy)
 		.method("read", &SpatVector::read)
 		.method("setGeometry", &SpatVector::setGeometry)
-		.method("setPointsXY", &SpatVector::setPointsGeometry)
+		.method("setPointsXY", (void (SpatVector::*)(std::vector<double>&, std::vector<double>&))(&SpatVector::setPointsGeometry))
+		.method("setPointsXYZ", (void (SpatVector::*)(std::vector<double>&, std::vector<double>&, std::vector<double>&))(&SpatVector::setPointsGeometry))
 		.method("setPointsDF", &SpatVector::setPointsDF)
 		.method("setLinesStartEnd", &SpatVector::setLinesStartEnd)
+		.method("has_z", &SpatVector::has_z)
 		.method("size", &SpatVector::size)
 		.method("subset_cols", ( SpatVector (SpatVector::*)(std::vector<long>))( &SpatVector::subset_cols ))
 		.method("subset_rows", ( SpatVector (SpatVector::*)(std::vector<long>))( &SpatVector::subset_rows ))
@@ -615,10 +631,9 @@ RCPP_MODULE(spat){
 
 		.method("disaggregate", &SpatVector::disaggregate)
 		.method("buffer", &SpatVector::buffer)
-//		.method("buffer2", &SpatVector::buffer2)
-//		.method("buffer3", &SpatVector::buffer3)
 		.method("centroid", &SpatVector::centroid)
 		.method("point_on_surface", &SpatVector::point_on_surface)
+		.method("corrected_centroid", &SpatVector::corrected_centroid)
 		.method("make_valid2", &SpatVector::make_valid2)
 		.method("flip", &SpatVector::flip)
 		.method("transpose", &SpatVector::transpose)
@@ -728,7 +743,7 @@ RCPP_MODULE(spat){
 		.constructor()
 	 // .constructor<std::string, int>()
 		.constructor<std::vector<std::string>, std::vector<int>, std::vector<std::string>, size_t, std::vector<std::string>, std::vector<std::string>, std::vector<int>, bool, bool, std::vector<std::string>, int>()
-		
+
 		.constructor<std::vector<size_t>, std::vector<double>, std::string>()
 		//.finalizer(&SpatRaster_finalizer)
 
@@ -772,6 +787,11 @@ RCPP_MODULE(spat){
 
 		.method("is_rotated", &SpatRaster::is_rotated)
 		.method("is_flipped", &SpatRaster::is_flipped)
+		.method("has_geoloc", &SpatRaster::has_geoloc)
+		.method("has_gcps", &SpatRaster::has_gcps)
+		.method("geoloc_srs", &SpatRaster::geoloc_srs)
+		.method("geoloc_x", &SpatRaster::geoloc_x)
+		.method("geoloc_y", &SpatRaster::geoloc_y)
 
 		.method("setWindow", &SpatRaster::setWindow, "")
 		.method("removeWindow", &SpatRaster::removeWindow, "")
@@ -943,7 +963,7 @@ RCPP_MODULE(spat){
 		.method("arith_rast", (SpatRaster (SpatRaster::*)(SpatRaster, std::string, bool, SpatOptions&) )( &SpatRaster::arith ))
 		.method("arith_numb", (SpatRaster (SpatRaster::*)(std::vector<double>, std::string, bool, bool,SpatOptions&) )( &SpatRaster::arith))
 		.method("arith_m", &SpatRaster::arith_m)
-		
+
 		.method("rst_area", &SpatRaster::rst_area)
 		.method("sum_area", &SpatRaster::sum_area)
 		.method("sum_area_group", &SpatRaster::sum_area_group)
@@ -974,10 +994,10 @@ RCPP_MODULE(spat){
 		.method("vectDistance", &SpatRaster::distance_vector)
 		.method("rastDirection", &SpatRaster::direction)
 		.method("vectDirectionRasterize", &SpatRaster::direction_rasterize)
-		
+
 //		.method("vectDistanceDirect", &SpatRaster::distance_spatvector)
 //		.method("vectDistanceRasterize", &SpatRaster::distance_rasterize)
-		
+
 		.method("get_tiles_ext", &SpatRaster::get_tiles_extent)
 		.method("get_tiles_ext_vect", &SpatRaster::get_tiles_extent_vect)
 		.method("make_tiles", &SpatRaster::make_tiles)
@@ -1014,7 +1034,7 @@ RCPP_MODULE(spat){
 		.method("extractVector", &SpatRaster::extractVector)
 		.method("extractVectorFlat", &SpatRaster::extractVectorFlat)
 		.method("extractBuffer", &SpatRaster::extractBuffer)
-			
+
 		.method("flip", &SpatRaster::flip)
 		.method("focal", &SpatRaster::focal)
 		.method("focal2", &SpatRaster::focal2)
@@ -1060,7 +1080,7 @@ RCPP_MODULE(spat){
 		.method("modal", &SpatRaster::modal)
 		.method("quantile", &SpatRaster::quantile)
 		.method("rasterize", &SpatRaster::rasterize)
-		
+
 		.method("rasterizePointsV", ( SpatRaster (SpatRaster::*)(SpatVector&, std::string, std::vector<double>&, bool, double, SpatOptions&) )( &SpatRaster::rasterizePoints))
 
 		.method("rasterizePointsXY", ( SpatRaster (SpatRaster::*)(std::vector<double>&, std::vector<double>&, std::string, std::vector<double>&, bool, double, SpatOptions&) )( &SpatRaster::rasterizePoints))
@@ -1121,12 +1141,17 @@ RCPP_MODULE(spat){
 		.method("zonal_poly", &SpatRaster::zonal_poly)		
 		.method("zonal_poly_table", &SpatRaster::zonal_poly_table)		
 		.method("zonal_poly_weighted", &SpatRaster::zonal_poly_weighted)		
+
 //		.method("zonal_old", &SpatRaster::zonal_old)
+
 		.method("watershed2", &SpatRaster::watershed2, "watershed2") //EC 20210311 // EC 20210702
 		.method("pitfinder2", &SpatRaster::pitfinder2, "pitfinder2") //EC 20220810 // EC 20220810	
 		.method("NIDP2", &SpatRaster::NIDP2, "NIDP2") //EC 20231031
 		.method("flowAccu2", &SpatRaster::flowAccu2) //, "flowAccu2") //EC 20231031
 		.method("flowAccu2_weight", &SpatRaster::flowAccu2_weight) //, "flowAccu2_weight") //EC 20231114
+    .method("d8ltd", &SpatRaster::d8ltd)  //EC 20240813//SpatRaster  SpatRaster::d8ltd(double lambda,SpatOptions &opt) 
+    .method("pitfillerm", &SpatRaster::pitfillerm)  //SpatRaster pitfillerm(SpatRaster pits,SpatOptions &opt); // EC 20241026
+
 	;
 
 	class_<SpatRasterCollection>("SpatRasterCollection")
@@ -1184,7 +1209,7 @@ RCPP_MODULE(spat){
 		.method("ext", &SpatRasterStack::getExtent)
 		.method("filenames", &SpatRasterStack::filenames)
 		.method("show", &SpatRasterStack::show)
-		
+
 		.method("get_crs", &SpatRasterStack::getSRS)
 		.property("names", &SpatRasterStack::get_names, &SpatRasterStack::set_names)
 		.property("long_names", &SpatRasterStack::get_longnames, &SpatRasterStack::set_longnames)

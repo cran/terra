@@ -33,7 +33,13 @@
 
 
 static std::string basename_trunc(const std::string &path, size_t maxlen = 150) {
-	std::string b = basename(path);
+	// Match R's basename(): trailing path separators are stripped before the
+	// last component is taken (so e.g. ".../:psl.zarr/" yields ":psl.zarr").
+	std::string p = path;
+	while (!p.empty() && (p.back() == '/' || p.back() == '\\')) {
+		p.pop_back();
+	}
+	std::string b = basename(p);
 	if (b.size() > maxlen) {
 		b = b.substr(0, maxlen) + "~";
 	}
@@ -351,10 +357,10 @@ std::string SpatRaster::show(bool one_based) {
 				srcs[i] = "memory";
 			} else {
 				std::string f = fnames[i];
-				f.erase(std::remove(f.begin(), f.end(), '"'), f.end());
 				if (f.substr(0, 5) != "HDF5:") {
 					f = basename_trunc(f);
 				}
+				f.erase(std::remove(f.begin(), f.end(), '"'), f.end());
 				srcs[i] = f;
 			}
 		}
@@ -487,12 +493,17 @@ std::string SpatRaster::show(bool one_based) {
 
 			std::vector<std::string> minv(rmin.size());
 			std::vector<std::string> maxv(rmax.size());
+			std::vector<int> vt = getValueType(false);
 			for (size_t i = 0; i < rmin.size(); i++) {
 				if (i < hMM.size() && !hMM[i]) {
 					minv[i] = " ? ";
 					maxv[i] = " ? ";
+				} else if ((i < vt.size()) && (vt[i] == 3)) {
+					// boolean
+					minv[i] = std::isnan(rmin[i]) ? "NaN" : (rmin[i] == 0 ? "FALSE" : "TRUE");
+					maxv[i] = std::isnan(rmax[i]) ? "NaN" : (rmax[i] == 0 ? "FALSE" : "TRUE");
 				} else {
-					// Known range: show NaN like R when all cell values are missing (not "?")
+					// known range
 					minv[i] = std::isnan(rmin[i]) ? "NaN" : double_to_string(rmin[i]);
 					maxv[i] = std::isnan(rmax[i]) ? "NaN" : double_to_string(rmax[i]);
 				}
@@ -704,7 +715,7 @@ std::string SpatRaster::show(bool one_based) {
 
 	// time
 	if (hasTime()) {
-		std::string tims = source[0].timestep;
+		std::string tims = getTimeStep();
 		std::string label = "time        ";
 		if (tims == "yearmonths")      label = "time (ymnts)";
 		else if (tims == "months")     label = "time (mnts) ";
@@ -713,11 +724,15 @@ std::string SpatRaster::show(bool one_based) {
 		else if (tims == "raw")        label = "time (raw)  ";
 
 		std::vector<std::string> ts = getTimeStr(false, " ");
-		if (!ts.empty()) {
-			std::string first_t = ts.front();
-			std::string last_t  = ts.back();
-			// unique count
-			std::vector<std::string> ut = ts;
+		std::vector<std::string> present;
+		present.reserve(ts.size());
+		for (const auto &t : ts) {
+			if (!t.empty()) present.push_back(t);
+		}
+		if (!present.empty()) {
+			std::string first_t = present.front();
+			std::string last_t  = present.back();
+			std::vector<std::string> ut = present;
 			std::sort(ut.begin(), ut.end());
 			ut.erase(std::unique(ut.begin(), ut.end()), ut.end());
 

@@ -16,7 +16,9 @@
 // along with spat. If not, see <http://www.gnu.org/licenses/>.
 
 #include <vector>
+#include <algorithm>
 #include "spatRaster.h"
+#include "spatTime.h"
 
 /*
 #include "string_utils.h"
@@ -108,29 +110,29 @@ void SpatRaster::combine(SpatRaster &x) {
 
 
 void SpatRaster::checkTime(SpatRaster &x) {
-	if (!hasTime()) {
+	if (!hasTime() || !x.hasTime()) {
+		return;
+	}
+	std::string step = unify_time_step(getTimeStep(), x.getTimeStep());
+	if (step.empty()) {
+		addWarning("time not combined: incompatible time step");
 		std::vector<int64_t> time;
+		setTime(time, "remove", "");
 		x.setTime(time, "remove", "");
 		return;
 	}
-	if (!x.hasTime()) {
-		std::vector<int64_t> time;
-		setTime(time, "remove", "");
-		return;
-	}
-	std::string s = source[0].timestep;
-	std::string xs = x.source[0].timestep;
-	if (s == xs) return;
-	if ((s == "days") && (xs == "seconds")) {
-		x.source[0].timestep = "days";
-	} else if ((s == "seconds") && (xs == "days")) {
-		for (size_t i=0; i<source.size(); i++) {
-			source[i].timestep = "days";
+	std::string zone = unify_time_zone(getTimeZone(), x.getTimeZone());
+	for (size_t i=0; i<source.size(); i++) {
+		if (source[i].hasTime) {
+			source[i].timestep = step;
+			source[i].timezone = zone;
 		}
-	} else {
-		std::vector<int64_t> time;
-		setTime(time, "remove", "");
-		x.setTime(time, "remove", "");
+	}
+	for (size_t i=0; i<x.source.size(); i++) {
+		if (x.source[i].hasTime) {
+			x.source[i].timestep = step;
+			x.source[i].timezone = zone;
+		}
 	}
 }
 
@@ -160,7 +162,7 @@ void SpatRaster::checkDepth(SpatRaster &x) {
 	}
 	setDepthName(uname);
 	x.setDepthName(uname);
-		
+
 	std::string nm = source[0].depthname;
 	std::string xnm = x.source[0].depthname;
 	if (nm != xnm) {
@@ -174,7 +176,7 @@ void SpatRaster::checkDepth(SpatRaster &x) {
 	} else {
 		dname = nm;
 	}
-	
+
 	setDepthName(dname);
 	x.setDepthName(dname);
 }
@@ -360,9 +362,15 @@ void SpatRasterSource::resize(size_t n) {
 	scale.resize(n, 1);
 	offset.resize(n, 0);
     hasColors.resize(n, false);
-	cols.resize(n);
     hasCategories.resize(n, false);
-	cats.resize(n);
+	// sparse cats/cols: drop entries for layers that no longer exist
+	// (also clears everything when n == 0)
+	for (auto it = cats.begin(); it != cats.end(); ) {
+		if (it->first >= n) it = cats.erase(it); else ++it;
+	}
+	for (auto it = cols.begin(); it != cols.end(); ) {
+		if (it->first >= n) it = cols.erase(it); else ++it;
+	}
     //hasAttributes.resize(n);
 	//atts.resize(n);
     //attsIndex.resize(n);
@@ -389,9 +397,7 @@ void SpatRasterSource::reserve(size_t n) {
 	scale.reserve(n);
 	offset.reserve(n);
     hasColors.reserve(n);
-	cols.reserve(n);
     hasCategories.reserve(n);
-	cats.reserve(n);
     //hasAttributes.reserve(n);
 	//atts.reserve(n);
     //attsIndex.reserve(n);
@@ -428,6 +434,11 @@ SpatRasterSource SpatRasterSource::subset(std::vector<size_t> lyrs) {
 		out.extent = extent;
 		out.rotated = rotated;
 		out.flipped = flipped;
+		out.has_geolocation = has_geolocation;
+		out.has_gcps = has_gcps;
+		out.geoloc_srs = geoloc_srs;
+		out.geoloc_x = geoloc_x;
+		out.geoloc_y = geoloc_y;
 		out.hasWindow = hasWindow;
 		out.window = window;
 		out.source_name = source_name;
@@ -462,10 +473,10 @@ SpatRasterSource SpatRasterSource::subset(std::vector<size_t> lyrs) {
         out.range_max.push_back(range_max[j]);
         out.blockrows.push_back(blockrows[j]);
         out.blockcols.push_back(blockcols[j]);
-        out.hasColors.push_back(hasColors[j]);
-        out.cols.push_back(cols[j]);
-        out.hasCategories.push_back(hasCategories[j]);
-        out.cats.push_back(cats[j]);
+        out.hasColors.push_back(hasCol(j));
+        if (hasCol(j)) out.cols[i] = getCol(j);
+        out.hasCategories.push_back(hasCat(j));
+        if (hasCat(j)) out.cats[i] = getCat(j);
 		out.has_scale_offset.push_back(has_scale_offset[j]);
 		out.scale.push_back(scale[j]);
 		out.offset.push_back(offset[j]);
@@ -570,8 +581,28 @@ bool SpatRasterSource::combine_sources(const SpatRasterSource &x) {
 	}
 	nlyr += x.nlyr;
 	names.insert(names.end(), x.names.begin(), x.names.end());
-	time.insert(time.end(), x.time.begin(), x.time.end());
-	if (!(hasTime & x.hasTime)) {
+	if (hasTime && x.hasTime) {
+		std::string st = unify_time_step(timestep, x.timestep);
+		if (st.empty()) {
+			hasTime = false;
+			time.insert(time.end(), x.nlyr, NA_TIME);
+		} else {
+			timestep = st;
+			timezone = unify_time_zone(timezone, x.timezone);
+			time.insert(time.end(), x.time.begin(), x.time.end());
+			hasTime = true;
+		}
+	} else if (hasTime && !x.hasTime) {
+		time.insert(time.end(), x.nlyr, NA_TIME);
+		hasTime = true;
+	} else if (!hasTime && x.hasTime) {
+		std::fill(time.begin(), time.end(), NA_TIME);
+		time.insert(time.end(), x.time.begin(), x.time.end());
+		timestep = x.timestep;
+		timezone = x.timezone;
+		hasTime = true;
+	} else {
+		time.insert(time.end(), x.time.begin(), x.time.end());
 		hasTime = false;
 	}
 	unit.insert(unit.end(), x.unit.begin(), x.unit.end());
@@ -588,10 +619,13 @@ bool SpatRasterSource::combine_sources(const SpatRasterSource &x) {
 	//hasAttributes.insert(hasAttributes.end(), x.hasAttributes.begin(), x.hasAttributes.end());
 	//atts.insert(atts.end(), x.atts.begin(), x.atts.end());
 	//attsIndex.insert(attsIndex.end(), x.attsIndex.begin(), x.attsIndex.end());
+	// x's layers are appended after this source's original layers; shift the
+	// sparse category/color keys accordingly (nlyr was already increased above)
+	size_t coff = nlyr - x.nlyr;
 	hasCategories.insert(hasCategories.end(), x.hasCategories.begin(), x.hasCategories.end());
-	cats.insert(cats.end(), x.cats.begin(), x.cats.end());
+	for (const auto &kv : x.cats) cats[coff + kv.first] = kv.second;
 	hasColors.insert(hasColors.end(), x.hasColors.begin(), x.hasColors.end());
-	cols.insert(cols.end(), x.cols.begin(), x.cols.end());
+	for (const auto &kv : x.cols) cols[coff + kv.first] = kv.second;
 	has_scale_offset.insert(has_scale_offset.end(), x.has_scale_offset.begin(), x.has_scale_offset.end());
 	scale.insert(scale.end(), x.scale.begin(), x.scale.end());
 	offset.insert(offset.end(), x.offset.begin(), x.offset.end());
@@ -620,8 +654,28 @@ bool SpatRasterSource::combine(SpatRasterSource &x) {
 	}
 	nlyr += x.nlyr;
 	names.insert(names.end(), x.names.begin(), x.names.end());
-	time.insert(time.end(), x.time.begin(), x.time.end());
-	if (!(hasTime & x.hasTime)) {
+	if (hasTime && x.hasTime) {
+		std::string st = unify_time_step(timestep, x.timestep);
+		if (st.empty()) {
+			hasTime = false;
+			time.insert(time.end(), x.nlyr, NA_TIME);
+		} else {
+			timestep = st;
+			timezone = unify_time_zone(timezone, x.timezone);
+			time.insert(time.end(), x.time.begin(), x.time.end());
+			hasTime = true;
+		}
+	} else if (hasTime && !x.hasTime) {
+		time.insert(time.end(), x.nlyr, NA_TIME);
+		hasTime = true;
+	} else if (!hasTime && x.hasTime) {
+		std::fill(time.begin(), time.end(), NA_TIME);
+		time.insert(time.end(), x.time.begin(), x.time.end());
+		timestep = x.timestep;
+		timezone = x.timezone;
+		hasTime = true;
+	} else {
+		time.insert(time.end(), x.time.begin(), x.time.end());
 		hasTime = false;
 	}
 	unit.insert(unit.end(), x.unit.begin(), x.unit.end());
@@ -636,10 +690,11 @@ bool SpatRasterSource::combine(SpatRasterSource &x) {
 	//hasAttributes.insert(hasAttributes.end(), x.hasAttributes.begin(), x.hasAttributes.end());
 	//atts.insert(atts.end(), x.atts.begin(), x.atts.end());
 	//attsIndex.insert(attsIndex.end(), x.attsIndex.begin(), x.attsIndex.end());
+	size_t coff = nlyr - x.nlyr;
 	hasCategories.insert(hasCategories.end(), x.hasCategories.begin(), x.hasCategories.end());
-	cats.insert(cats.end(), x.cats.begin(), x.cats.end());
+	for (const auto &kv : x.cats) cats[coff + kv.first] = kv.second;
 	hasColors.insert(hasColors.end(), x.hasColors.begin(), x.hasColors.end());
-	cols.insert(cols.end(), x.cols.begin(), x.cols.end());
+	for (const auto &kv : x.cols) cols[coff + kv.first] = kv.second;
 	valueType.insert(valueType.end(), x.valueType.begin(), x.valueType.end());
 //	dataType.insert(dataType.end(), x.dataType.begin(), x.dataType.end());
 	has_scale_offset.insert(has_scale_offset.end(), x.has_scale_offset.begin(), x.has_scale_offset.end());
