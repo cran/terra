@@ -1,4 +1,30 @@
+# version 1.9-50
+
+## bug fixes
+
+- `union` could in some cases return an intersection instead [#2175](https://github.com/rspatial/terra/issues/2175) by Alex Chubaty
+- `erase` could return more attribute rows than geometries when a polygon difference became a non-polygon (e.g. a line from a zero-area ring) [#2179](https://github.com/rspatial/terra/issues/2179) by Alex Chubaty
+- terra did not compile with GDAL < 3.4 [#2174](https://github.com/rspatial/terra/issues/2174) by Wes Cummings
+- terra did not compile with GEOS < 3.10.0 [#2172](https://github.com/rspatial/terra/issues/2172) by Shane Sturrock
+- UBSAN error in internal use of flowDir (reported by CRAN)
+- `pitfiller` did not properly handle missing values [#2168](https://github.com/rspatial/terra/issues/2168) by Michael Chirico
+- GRIB files with 0 to 360 longitude are by default remapped to -180 to 180 by the classic GDAL GRIB driver. The multdimensional driver does not do that. This created a mismatched longitude extent (taken from the classic driver) when opening such a file with the multidim interface [#2178](https://github.com/rspatial/terra/issues/2178) by Yadong Liu
+- `rast` with the default multidim probe discarded GDAL open error messages [#2185](https://github.com/rspatial/terra/issues/2185) by Krzysztof Dyba
+
+## enhancements
+
+- `project` gains arguments `warpOpts` (GDAL `-wo`, SpatRaster only) and `transOpts` (transformer options for SpatRaster and SpatVector) [#2182](https://github.com/rspatial/terra/issues/2182) by Michael Sumner. 
+- `project` arguments `AOI`, `desired_accuracy`, and `allow_approx` were removed in favor of `transOpts` ("AREA_OF_INTEREST= ", "DESIRED_ACCURACY= ", "ALLOW_BALLPARK= "). 
+- When projecting a SpatRaster to a SpatRaster template `y`, its lon/lat extent is passed as `AREA_OF_INTEREST` unless this was set in `transOpts`
+
+## new 
+
+`gdal_has_pam` to allow skipping tests if GDAL PAM is not enabled  [#2170](https://github.com/rspatial/terra/issues/2170) by Michael Chirico
+
+
 # version 1.9-46
+
+Released 2026-08-21
 
 ## bug fixes
 
@@ -52,7 +78,7 @@ Released 2026-06-20
 - recurring `Cannot take exclusive lock on cache.db` PROJ warnings during `project` are now collapsed into a single, actionable message [#2088](https://github.com/rspatial/terra/issues/2088)
 - retro labels generated with `plot(x, pax=list(retro=TRUE))` were incorrect in the W and S hemispheres [#2090](https://github.com/rspatial/terra/issues/2090) by Lucas Salinas Morales
 - `trim` failed with "invalid extent" if the trimmed bounding box was within `padding` cells of the raster edge [#2092](https://github.com/rspatial/terra/issues/2092) by James Howard
-- With the new default "md=TRUE", `rast` reported a "file does not exist" error with a GDAL DSN string (e.g. `NETCDF:".../file.nc":VAR`). , `rast` now splits a `DRIVER:"path":VAR` DSN so the multidim API can find the file. It reuses the classic 2D driver's geotransform so the extent is reported in CRS units instead of raw coordinate-variable values [#2093](https://github.com/rspatial/terra/issues/2093) by Michael Sumner
+- With the new default "md=TRUE", `rast` reported a "file does not exist" error with a GDAL DSN string (e.g. `NETCDF:".../file.nc":VAR`). `rast` now splits a `DRIVER:"path":VAR` DSN so the multidim API can find the file. It reuses the classic 2D driver's geotransform so the extent is reported in CRS units instead of raw coordinate-variable values [#2093](https://github.com/rspatial/terra/issues/2093) by Michael Sumner
 - `writeRaster(x, filename, filetype="COG")` segfaulted with GDAL 3.13.0 because the COG driver now has `Create()` that crashes with `RasterIO` crashes; terra now always writes COGs via the original `CreateCopy()` path [#2095](https://github.com/rspatial/terra/issues/2095) by Andrew Brown
 
 

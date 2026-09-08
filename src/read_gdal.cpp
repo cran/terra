@@ -37,6 +37,7 @@
 //#include "NA.h"
 
 #include "gdal_priv.h"
+#include "gdal_compat.h"
 #include "cpl_conv.h" // for CPLMalloc()
 #include "cpl_string.h"
 #include "ogr_spatialref.h"
@@ -1180,13 +1181,21 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 	const bool md_probe = (multi >= 1);
 	if (md_probe) gdal_capture_messages_begin();
 #endif
+	// Classic-open GDAL diagnostics kept when the open fails and md may retry.
+	std::vector<std::string> classic_gdal_msgs;
 
     GDALDataset *poDataset = openGDAL(fname, GDAL_OF_RASTER | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR, drivers, clean_ops);
 
 #if GDAL_VERSION_NUM >= 3040000
-	// Keep the probe's messages only when the classic open succeeded; otherwise
-	// discard them (the multidim fallback below emits its own diagnostics).
-	if (md_probe) gdal_capture_messages_end(poDataset != NULL);
+	// Successful classic open: replay buffered messages. Failed open: hold them
+	// so they can be attached to the final error if the multidim retry also fails (#2185).
+	if (md_probe) {
+		if (poDataset != NULL) {
+			gdal_capture_messages_end(true);
+		} else {
+			classic_gdal_msgs = gdal_capture_messages_end_take();
+		}
+	}
 #endif
 
     if( poDataset == NULL )  {
@@ -1211,12 +1220,24 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 			msg.clearError();
 		}
 #endif
+		std::string gdal_detail;
+		if (!classic_gdal_msgs.empty()) {
+			gdal_detail = "\n       (GDAL) ";
+			for (size_t i = 0; i < classic_gdal_msgs.size(); i++) {
+				if (i > 0) gdal_detail += "; ";
+				gdal_detail += classic_gdal_msgs[i];
+			}
+			//gdal_detail += ")";
+		}
 		if (looks_like_gdal_dsn(fname)) {
-			setError("cannot open this file as a SpatRaster: " + fname);
-		} else if (!file_exists(fname)) {
+			setError("cannot open this file as a SpatRaster: " + fname + gdal_detail);
+		} else if (!file_exists(fname) && classic_gdal_msgs.empty()) {
 			setError("file does not exist: " + fname);
+		} else if (!file_exists(fname)) {
+			// Remote / VSI open often fails without a local path; prefer GDAL's reason (#2185)
+			setError("cannot open this file as a SpatRaster: " + fname + gdal_detail);
 		} else {
-			setError("cannot open this file as a SpatRaster: " + fname);
+			setError("cannot open this file as a SpatRaster: " + fname + gdal_detail);
 		}
 		return false;
 	}
@@ -1256,13 +1277,36 @@ bool SpatRaster::constructFromFile(std::string fname, std::vector<int> subds, st
 			if (xmin > xmax) std::swap(xmin, xmax);
 			double ymax = adfGT[3];
 			double ymin = ymax + adfGT[5] * source[0].nrow;
+			bool flipped = false;
 			if (adfGT[5] > 0) {
-				source[0].flipped = true;
+				flipped = true;
 				std::swap(ymin, ymax);
 			}
-			source[0].extent = SpatExtent(xmin, xmax, ymin, ymax);
-			if (adfGT[2] != 0 || adfGT[4] != 0) {
-				source[0].rotated = true;
+			bool rotated = (adfGT[2] != 0 || adfGT[4] != 0);
+			for (size_t si = 0; si < source.size(); si++) {
+				// GRIB classic: 0-360 to -180-180 with pixel rewrap. MD keeps 0-360
+				// pixel order (#2178); shift columns when adopting classic extent.
+				if (gdrv == "GRIB") {
+					double md_xmin = source[si].extent.xmin;
+					double md_xmax = source[si].extent.xmax;
+					if (md_xmin > -1.0 && md_xmin < 2.0 && md_xmax > 350.0 && xmin < -170.0) {
+						double xres = (md_xmax - md_xmin) / (double) source[si].ncol;
+						if (xres > 0) {
+							size_t wrap = (size_t) ((md_xmin - xmin) / xres + 1e-9);
+							if (source[si].ncol > 0) {
+								wrap %= source[si].ncol;
+							}
+							source[si].m_x_wrap = wrap;
+						}
+					}
+				}
+				source[si].extent = SpatExtent(xmin, xmax, ymin, ymax);
+				if (flipped) {
+					source[si].flipped = true;
+				}
+				if (rotated) {
+					source[si].rotated = true;
+				}
 			}
 		};
 

@@ -8,6 +8,7 @@
 #include "sort.h"
 
 #include "gdal_priv.h"
+#include "gdal_compat.h"
 #include "gdalio.h"
 #include "ogr_spatialref.h"
 
@@ -72,12 +73,21 @@ std::vector<size_t> open_file_lim() {
 
 // [[Rcpp::export(name = ".proj_conf_test")]]
 bool proj_conf_test() {
+#ifdef projh
     PJ *crs = proj_create(nullptr, "EPSG:4326");
     if (!crs) {
         return false;
     }
     proj_destroy(crs);
     return true;
+#else
+	projPJ pj = pj_init_plus("+proj=longlat +datum=WGS84");
+	if (pj == nullptr) {
+		return false;
+	}
+	pj_free(pj);
+	return true;
+#endif
 }
 
 
@@ -269,6 +279,14 @@ std::vector<std::vector<std::string>> sd_info(std::string filename) {
 // [[Rcpp::export(name = ".gdal_version")]]
 std::string gdal_version() {
 	const char* what = "RELEASE_NAME";
+	const char* x = GDALVersionInfo(what);
+	std::string s = (std::string) x;
+	return s;
+}
+
+// [[Rcpp::export(name = ".gdal_build_info")]]
+std::string gdal_build_info() {
+	const char* what = "BUILD_INFO";
 	const char* x = GDALVersionInfo(what);
 	std::string s = (std::string) x;
 	return s;
@@ -698,12 +716,17 @@ bool set_proj_search_paths(std::vector<std::string> paths, bool with_proj = fals
 		return false;
 	}
 	if (with_proj) {
-		// Set for PROJ library
+		// Set for PROJ library (proj.h / PROJ >= 6; only available with GDAL >= 3 here)
+#ifdef projh
 		if (paths.size() == 1) {
 			const char *cp = paths[0].c_str();
 			proj_context_set_search_paths(PJ_DEFAULT_CTX, 1, &cp);
 		}
 		return true;
+#else
+		(void)paths;
+		return false;
+#endif
 	} else {
 		// Set for GDAL
 #if GDAL_VERSION_NUM >= 3000000
