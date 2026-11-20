@@ -757,6 +757,7 @@ RCPP_MODULE(spat){
 		.method("getError", &SpatRaster::getError)
 		.method("getWarnings", &SpatRaster::getWarnings)
 		.method("getMessage", &SpatRaster::getMessage)
+		.method("get_misc", &SpatRaster::get_misc)
 
 		.method("addTag", &SpatRaster::addTag)
 		.method("getTags", &SpatRaster::getTags)
@@ -943,6 +944,7 @@ RCPP_MODULE(spat){
 		.method("writeStart", &SpatRaster::writeStart)
 		.method("writeStop", &SpatRaster::writeStop)
 		.method("writeValues", &SpatRaster::writeValues)
+		.method("writeValuesRect", &SpatRaster::writeValuesRect)
 		.method("writeRaster", &SpatRaster::writeRaster)
 		.method("canProcessInMemory", &SpatRaster::canProcessInMemory)
 		.method("chunkSize", &SpatRaster::chunkSize)
@@ -1016,6 +1018,7 @@ RCPP_MODULE(spat){
 		.method("classify", ( SpatRaster (SpatRaster::*)(std::vector<double>, size_t, unsigned, bool, bool, double, bool, bool, bool, SpatOptions&) )( &SpatRaster::reclassify))
 		//.method("source_collapse", &SpatRaster::collapse, "collapse")
 		.method("selRange", &SpatRaster::selRange)
+		.method("selectHighest", &SpatRaster::selectHighest)
 		.method("separate", &SpatRaster::separate)
 		.method("sort", &SpatRaster::sort)
 		.method("intersect", &SpatRaster::intersect)
@@ -1050,8 +1053,8 @@ RCPP_MODULE(spat){
 		.method("layerCor", &SpatRaster::layerCor)
 		.method("global_weighted_mean", &SpatRaster::global_weighted_mean)
 
-		.method("initf", ( SpatRaster (SpatRaster::*)(std::string, bool, SpatOptions&) )( &SpatRaster::init ), "init fun")
-		.method("initv", ( SpatRaster (SpatRaster::*)(std::vector<double>, SpatOptions&) )( &SpatRaster::init ), "init value")
+		.method("initf", ( SpatRaster (SpatRaster::*)(std::string, bool, bool, SpatOptions&) )( &SpatRaster::init ), "init fun")
+		.method("initv", ( SpatRaster (SpatRaster::*)(std::vector<double>, bool, SpatOptions&) )( &SpatRaster::init ), "init value")
 		.method("is_in", &SpatRaster::is_in)
 		.method("is_in_cells", &SpatRaster::is_in_cells)
 

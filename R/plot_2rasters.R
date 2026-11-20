@@ -197,8 +197,8 @@ setMethod("plot", signature(x="SpatRaster", y="SpatRaster"),
 	if (!is.null(xlim) | !is.null(ylim)) {
 		if (is.null(xlim)) xlim <- c(xmin(x), xmax(x))
 		if (is.null(ylim)) ylim <- c(ymin(x), ymax(x))
-		e <- extent(xlim, ylim)
-		out <- extend(crop(out, e), e, value=0)
+		e <- ext(xlim, ylim)
+		out <- extend(crop(out, e), e, fill=0)
 	}
 	plot(out, maxcell=nc*nr, asp=asp, ...)
 }

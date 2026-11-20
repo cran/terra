@@ -713,6 +713,10 @@ static bool md_fill_source_from_marray(
 	} else {
 		s.m_missing_value = poVar->GetNoDataValueAsDouble(&s.m_hasNA);
 	}
+	if (s.m_hasNA && !std::isnan(s.m_missing_value)) {
+		s.hasFileNA = true;
+		s.fileNAflag = s.m_missing_value;
+	}
 
 	int ix = md_find_col_dim(dimnames, dimData);
 	int iy = md_find_row_dim(dimnames, dimData);
@@ -827,6 +831,7 @@ static bool md_fill_source_from_marray(
 
 
 	std::vector<size_t> extra_sizes;
+	extra_sizes.reserve(dimmap_extras.size());
 	for (size_t e : dimmap_extras) {
 		extra_sizes.push_back(dimcount[e]);
 	}
@@ -1422,7 +1427,14 @@ bool SpatRaster::readChunkMulti(std::vector<double> &data, size_t src, size_t ro
 	const size_t coldim = source[src].m_dims[0];
 	const size_t rowdim = source[src].m_dims[1];
 	const size_t wrap = source[src].m_x_wrap;
-	const size_t N = ncol();
+	const size_t N = source[src].m_size[coldim];
+	const size_t nfile = source[src].m_size[rowdim];
+
+	// crop(mask=TRUE) uses setWindow; nrow()/ncol() are then the window (#2212)
+	if (source[src].hasWindow) {
+		row += source[src].window.off_row;
+		col += source[src].window.off_col;
+	}
 
 	offset[coldim] = col;
 	offset[rowdim] = row;
@@ -1436,7 +1448,7 @@ bool SpatRaster::readChunkMulti(std::vector<double> &data, size_t src, size_t ro
 	// (A negative stride passed to Read is correct but extremely slow)
 	const bool need_flip = !source[src].flipped;
 	if (need_flip) {
-		offset[rowdim] = nrow() - row - nrows;
+		offset[rowdim] = nfile - row - nrows;
 	}
 	const long long int *stride_arg = nullptr;
 
@@ -1593,9 +1605,10 @@ bool SpatRaster::readRowColMulti(size_t src, std::vector<std::vector<double>> &o
 		}
 	}
 
-	// array (file) row/col for each point; out-of-range points remain NAN
-	const int64_t nr1 = (int64_t) nrow() - 1;
-	const int64_t nc1 = (int64_t) ncol() - 1;
+	// array (file) row/col for each point; out-of-range points remain NAN.
+	// extract() already adds window offsets, so bounds are the full array (#2212).
+	const int64_t nr1 = (int64_t) source[src].m_size[rowdim] - 1;
+	const int64_t nc1 = (int64_t) source[src].m_size[coldim] - 1;
 	std::vector<size_t> frow(n), fcol(n);
 	std::vector<size_t> pts;
 	pts.reserve(n);

@@ -1680,7 +1680,6 @@ std::vector<double> SpatVector::length() {
 
 	size_t s = size();
 	std::vector<double> r;
-	r.reserve(s);
 
 	double m = srs.to_meter();
 	m = std::isnan(m) ? 1 : m;

@@ -5,6 +5,21 @@
 
 
 
+setMethod("selectHighest", signature(x="SpatRaster"),
+	function(x, n, low=FALSE, ties="first", filename="", ...) {
+		n <- as.numeric(n[1])
+		if (!is.finite(n) || (n < 1)) {
+			error("selectHighest", "n must be a positive number")
+		}
+		ties <- match.arg(ties[1], c("all", "first"))
+		opt <- spatOptions(filename, ...)
+		x@pntr <- x@pntr$selectHighest(n, isTRUE(low[1]), ties == "all", opt)
+		messages(x, "selectHighest")
+	}
+)
+
+
+
 setMethod("centroids", signature(x="SpatRaster"),
 	function(x, weighted=FALSE) {
 		opt <- spatOptions()
@@ -1157,8 +1172,45 @@ setMethod("segregate", signature(x="SpatRaster"),
 )
 
 
+.extent_center <- function(x) {
+	e <- as.vector(ext(x))
+	c(mean(e[1:2]), mean(e[3:4]))
+}
+
+
+.shift_from_to <- function(x, to) {
+	from <- .extent_center(x)
+	if (is.numeric(to)) {
+		to <- as.vector(to)
+		n <- length(to)
+		if (n == 2) {
+			dx <- if (is.na(to[1])) 0 else to[1] - from[1]
+			dy <- if (is.na(to[2])) 0 else to[2] - from[2]
+			return(c(dx, dy))
+		}
+		if (n != 4) {
+			error("shift", "'to' must be two coordinates (x, y), or a SpatExtent (or an object that has an extent)")
+		}
+	}
+	e <- try(ext(to), silent=TRUE)
+	if (inherits(e, "try-error")) {
+		error("shift", "'to' must be a SpatExtent (or an object that has an extent), or two coordinates (x, y)")
+	}
+	toxy <- .extent_center(e)
+	c(toxy[1] - from[1], toxy[2] - from[2])
+}
+
+
 setMethod("shift", signature(x="SpatRaster"),
-	function(x, dx=0, dy=0, filename="", ...) {
+	function(x, dx=0, dy=0, filename="", to, ...) {
+		if (!missing(to)) {
+			if (!missing(dx) || !missing(dy)) {
+				error("shift", "cannot use both 'to' and 'dx'/'dy'")
+			}
+			d <- .shift_from_to(x, to)
+			dx <- d[1]
+			dy <- d[2]
+		}
 		opt <- spatOptions(filename, ...)
 		x@pntr <- x@pntr$shift(dx, dy, opt)
 		messages(x, "shift")
@@ -1167,7 +1219,15 @@ setMethod("shift", signature(x="SpatRaster"),
 
 
 setMethod("shift", signature(x="SpatExtent"),
-	function(x, dx=0, dy=0) {
+	function(x, dx=0, dy=0, to) {
+		if (!missing(to)) {
+			if (!missing(dx) || !missing(dy)) {
+				error("shift", "cannot use both 'to' and 'dx'/'dy'")
+			}
+			d <- .shift_from_to(x, to)
+			dx <- d[1]
+			dy <- d[2]
+		}
 		s <- c(dx[1], dx[1], dy[1], dy[1])
 		ext(as.vector(x) + s)
 	}
@@ -1175,7 +1235,15 @@ setMethod("shift", signature(x="SpatExtent"),
 
 
 setMethod("shift", signature(x="SpatVector"),
-	function(x, dx=0, dy=0) {
+	function(x, dx=0, dy=0, to) {
+		if (!missing(to)) {
+			if (!missing(dx) || !missing(dy)) {
+				error("shift", "cannot use both 'to' and 'dx'/'dy'")
+			}
+			d <- .shift_from_to(x, to)
+			dx <- d[1]
+			dy <- d[2]
+		}
 		x@pntr <- x@pntr$shift(dx, dy)
 		messages(x, "shift")
 	}
@@ -1242,7 +1310,17 @@ setMethod("scale", signature(x="SpatRaster"),
 			doscale = TRUE;
 		}
 		x@pntr <- x@pntr$scale(center, docenter, scale, doscale, opt)
-		messages(x, "scale")
+		x <- messages(x, "scale")
+		v <- x@pntr$get_misc()
+		if (docenter) {
+			n <- if (length(center) == 0) nlyr(x) else length(center)
+			attr(x, "scaled:center") <- v[seq_len(n)]
+			v <- v[-seq_len(n)]
+		}
+		if (doscale) {
+			attr(x, "scaled:scale") <- v
+		}
+		x
 	}
 )
 

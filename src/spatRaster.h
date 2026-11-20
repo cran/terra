@@ -257,6 +257,9 @@ class SpatRasterSource {
 		// user set for reading:
 		bool hasNAflag = false;
 		double NAflag = NAN;
+		// from file metadata (GetNoDataValue), not a user override
+		bool hasFileNA = false;
+		double fileNAflag = NAN;
 
 		std::vector<bool> has_scale_offset;
 		std::vector<double> scale;
@@ -346,6 +349,9 @@ class SpatRaster {
 		std::vector<std::string> getWarnings() { return msg.getWarnings();}
 		std::string getError() { return msg.getError();}
 		std::string getMessage() { return msg.getMessage();}
+
+		std::vector<double> misc;
+		std::vector<double> get_misc() { return misc; };
 
 		std::vector<std::vector<std::string>> user_tags;
 		bool addTag(std::string name, std::string value, std::string domain);
@@ -483,6 +489,7 @@ class SpatRaster {
 
 		bool setNAflag(std::vector<double> flag);
 		std::vector<double> getNAflag();
+		bool sourceHasFileNA();
 
 		std::vector<std::vector<std::string>> getMetadata(bool layers);
 
@@ -880,7 +887,9 @@ class SpatRaster {
 		SpatRaster costDistanceDijkstra(double target, double m, bool grid, bool nearest, SpatOptions &opt);
 
 		SpatRaster init(std::string value, bool plusone, SpatOptions &opt);
+		SpatRaster init(std::string value, bool mask, bool plusone, SpatOptions &opt);
 		SpatRaster init(std::vector<double> values, SpatOptions &opt);
+		SpatRaster init(std::vector<double> values, bool mask, SpatOptions &opt);
 
 		SpatRaster is_in(std::vector<double> m, SpatOptions &opt);
 		std::vector<std::vector<double>> is_in_cells(std::vector<double> m, bool keepvalue, SpatOptions &opt);
@@ -1012,7 +1021,7 @@ class SpatRaster {
 		SpatRaster hillshade(SpatRaster aspect, std::vector<double> angle, std::vector<double> direction, bool normalize, SpatOptions &opt);
 
 		SpatRaster selRange(SpatRaster x, int z, int recycleby, SpatOptions &opt);
-		SpatRaster selectHighest(size_t n, bool low, SpatOptions &opt);
+		SpatRaster selectHighest(size_t n, bool low, bool all, SpatOptions &opt);
 
 		SpatRaster shift(double x, double y, SpatOptions &opt);
 		SpatRaster summary(std::string fun, bool narm, SpatOptions &opt);

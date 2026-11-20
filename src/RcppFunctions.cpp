@@ -575,6 +575,10 @@ void gdal_init(std::string projpath, std::string datapath) {
 	CPLSetConfigOption("OGR_CT_FORCE_TRADITIONAL_GIS_ORDER", "YES");
 	CPLSetConfigOption("GDAL_DATA", datapath.c_str());
 	CPLSetConfigOption("CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE", "YES");
+	// Cap the block cache at 64 MB unless the user already set GDAL_CACHEMAX.
+	if (CPLGetConfigOption("GDAL_CACHEMAX", nullptr) == nullptr) {
+		GDALSetCacheMax64(static_cast<GIntBig>(64e6));
+	}
 	//GDAL_NETCDF_IGNORE_XY_AXIS_NAME_CHECKS
 
 	//GDALregistred = true;
@@ -818,6 +822,15 @@ void removeDriver(std::vector<std::string> d) {
 			}
 		}
 	}
+}
+
+
+// [[Rcpp::export(name = ".modal_value")]]
+double modal_value_r(std::vector<double> values, unsigned ties, bool narm) {
+	uint32_t seed = static_cast<uint32_t>(R::unif_rand() * 4294967295.0);
+	std::default_random_engine rgen(seed);
+	std::uniform_real_distribution<double> dist(0.0, 1.0);
+	return modal_value(values, ties, narm, rgen, dist);
 }
 
 

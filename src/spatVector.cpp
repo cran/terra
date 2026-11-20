@@ -218,11 +218,8 @@ std::vector<std::vector<double>> SpatGeom::coordinates() {
 	out[0].reserve(ncrds);
 	out[1].reserve(ncrds);
 	for (size_t j=0; j<np; j++) {
-		size_t nx = parts[j].x.size();
-		for (size_t q=0; q < nx; q++) {
-			out[0].insert(out[0].end(), parts[j].x.begin(), parts[j].x.end());
-			out[1].insert(out[1].end(), parts[j].y.begin(), parts[j].y.end());
-		}
+		out[0].insert(out[0].end(), parts[j].x.begin(), parts[j].x.end());
+		out[1].insert(out[1].end(), parts[j].y.begin(), parts[j].y.end());
 		if (parts[j].hasHoles()) {
 			size_t nh =  parts[j].nHoles();
 			for (size_t k=0; k < nh; k++) {
@@ -798,22 +795,22 @@ std::vector<std::string> SpatVector::getGeometryWKT() {
 		}
 
 		if ((g.gtype == polygons) | (n > 1)) {
-			wkt += "(";
+			wkt += '(';
 		}
 
 		for (size_t j=0; j < n; j++) {
 			SpatPart p = g.getPart(j);
-			if (j>0) wkt += ",";
+			if (j>0) wkt += ',';
 
 			if ((g.gtype == polygons) & (n > 1)) {
-				wkt += "(";
+				wkt += '(';
 			}
 
 			wkt += "(" + nice_string(p.x[0]) + " " + nice_string(p.y[0]);
 			for (size_t q=1; q < p.x.size(); q++) {
 				wkt += ", " + nice_string(p.x[q]) + " " + nice_string(p.y[q]);
 			}
-			wkt += ")";
+			wkt += ')';
 			if (p.hasHoles()) {
 				for (size_t k=0; k < p.nHoles(); k++) {
 					SpatHole h = p.getHole(k);
@@ -821,15 +818,15 @@ std::vector<std::string> SpatVector::getGeometryWKT() {
 					for (size_t q=1; q < h.x.size(); q++) {
 						wkt += ", " + nice_string(h.x[q]) + " " + nice_string(h.y[q]);
 					}
-					wkt += ")";
+					wkt += ')';
 				}
 			}
 			if ((g.gtype == polygons) & (n > 1)) {
-				wkt += ")";
+				wkt += ')';
 			}
 		}
 		if ((g.gtype == polygons) | (n > 1)) {
-			wkt += ")";
+			wkt += ')';
 		}
 		out[i] = wkt;
 	}

@@ -1,4 +1,50 @@
+# version 1.9-59
+
+## bug fixes
+
+- `plot<SpatVector>` ignored `colNA` when `type="continuous"` [#2198](https://github.com/rspatial/terra/issues/2198) by Márcia Barbosa
+- `rasterize` with `filename` and an integer `datatype` wrote the background as 0 instead of `NA` [#2195](https://github.com/rspatial/terra/issues/2195) by NewGraphEnvironment
+- `extract` with `layer` did not work well if `cells` or `xy` were set to TRUE [#2203](https://github.com/rspatial/terra/issues/2203) by Breeze-Hu
+- `predict` failed on a one-column raster with more than about 40 rows [#2206](https://github.com/rspatial/terra/issues/2206) by Acanthiza
+- `crop` to disk treated valid `INT2U` values of 65535 as missing when the source had no NoData tag [#2207](https://github.com/rspatial/terra/issues/2207) by Jakub Nowosad
+- `crop` with `mask=TRUE` on a raster opened with the multidimensional API ignored the cropping window [#2212](https://github.com/rspatial/terra/issues/2212) by Ondřej Ledvinka
+- `init` with a function failed on a multi-source SpatRaster (`the condition has length > 1` in `writeStop`) after the `mask` argument was added
+- `aggregate<SpatVector>` by more than one variable failed with when a grouping field had `NA`
+- scatterplot of two rasters did not work when supplying xlim/ylim arguments [#2230](https://github.com/rspatial/terra/issues/2230) by Agustín Lobo
+- a rescaled spatstat image was not imported correctly, it applied the scale factor to the values [#2236](https://github.com/rspatial/terra/issues/2236) by Manny Gimond
+- `perim` and `crosstab` no longer call `std::vector::reserve` before returning values to R (AddressSanitizer container-overflow reports on the CRAN M1-SAN machine)
+
+## enhancements
+
+- GDAL raster block cache is set to 64 MB at load unless `GDAL_CACHEMAX` is already set 
+- raster processing chunks are aligned to the source file's block height when that is reported
+- `rasterize` of points now accepts `fun="modal"`
+- `init` gains argument `mask=TRUE` to set output cells to `NA` where `x` is `NA` [#2194](https://github.com/rspatial/terra/issues/2194) by Márcia Barbosa
+- `focal` now errors if `NAonly` is used, and ignores `pad` with a warning (arguments from `raster::focal`) [#2189](https://github.com/rspatial/terra/issues/2189) by leunissene-ESNZ
+- `writeValues` gains arguments `col` and `ncols` like `readValues` [#2188](https://github.com/rspatial/terra/issues/2188) by kbvernon
+- `scale<SpatRaster>` attaches attributes `"scaled:center"` and `"scaled:scale"` as in `base::scale`
+- removed spurious "missing geotransform" warning for some file when using `rast(..., md=TRUE)` [#2208](https://github.com/rspatial/terra/issues/2208) by Kodi Arfer
+- `shift` gains argument `to` to center an object on a point or on the extent of another object [#2201](https://github.com/rspatial/terra/issues/2201) by Márcia Barbosa
+- `text<SpatVector>` gains argument `fit` to attempt to plot labels entirely inside their corresponding polygon
+- `plot<SpatRaster>` gains arguments `blend` and `blendfun` to combine the mapped colors (and alpha) of `x` with another raster (e.g. hillshade with "multiply")
+- `selectHighest` has new argument `ties` to choose exactly `n` cells (`"first"`, the default) or all cells with the `n` extreme values (`"all"`)
+- continuous `plot` legends with `plg$x` of `"left"`/`"right"`, `"topleft"`/`"topright"` and `"bottomleft"`/`"bottomright"` now share `size` and only differ in vertical alignment
+- categorical `plot` legends accept an `"...-out"` placement keyword (e.g. `"bottomleft-out"`, `"top-out"`) to draw the legend outside the map; the default is `"topright-out"` [#2219](https://github.com/rspatial/terra/issues/2219)
+- `hull` gains argument `percent` to use only the features closest to the centroid [#2217](https://github.com/rspatial/terra/issues/2217) by Márcia Barbosa
+- Fixed parenthesis in multidimensional raster print of dimensions [#2226](https://github.com/rspatial/terra/pull/2226) by Sinkleberg
+
+
+## new 
+
+- `modal` for vectors implementation. Moved from the raster package but using the terra C++ implementation
+- `distValues` to compute the distance from the (environmental) values at sites to these values in each raster cell.
+- `plot` methods for SpatRasterCollection and SpatRasterDataset [#2199](https://github.com/rspatial/terra/issues/2199) by Márcia Barbosa
+- `selectSize<SpatVector>` method to select polygons by size [#2215](https://github.com/rspatial/terra/pull/2215) by Márcia Barbosa
+
+
 # version 1.9-50
+
+Released 2026-09-08
 
 ## bug fixes
 
@@ -6,7 +52,7 @@
 - `erase` could return more attribute rows than geometries when a polygon difference became a non-polygon (e.g. a line from a zero-area ring) [#2179](https://github.com/rspatial/terra/issues/2179) by Alex Chubaty
 - terra did not compile with GDAL < 3.4 [#2174](https://github.com/rspatial/terra/issues/2174) by Wes Cummings
 - terra did not compile with GEOS < 3.10.0 [#2172](https://github.com/rspatial/terra/issues/2172) by Shane Sturrock
-- UBSAN error in internal use of flowDir (reported by CRAN)
+- integer overflow (UBSAN) error in internal use of flowDir (reported by CRAN)
 - `pitfiller` did not properly handle missing values [#2168](https://github.com/rspatial/terra/issues/2168) by Michael Chirico
 - GRIB files with 0 to 360 longitude are by default remapped to -180 to 180 by the classic GDAL GRIB driver. The multdimensional driver does not do that. This created a mismatched longitude extent (taken from the classic driver) when opening such a file with the multidim interface [#2178](https://github.com/rspatial/terra/issues/2178) by Yadong Liu
 - `rast` with the default multidim probe discarded GDAL open error messages [#2185](https://github.com/rspatial/terra/issues/2185) by Krzysztof Dyba
@@ -19,7 +65,7 @@
 
 ## new 
 
-`gdal_has_pam` to allow skipping tests if GDAL PAM is not enabled  [#2170](https://github.com/rspatial/terra/issues/2170) by Michael Chirico
+- `gdal_has_pam` to allow skipping tests if GDAL PAM is not enabled  [#2170](https://github.com/rspatial/terra/issues/2170) by Michael Chirico
 
 
 # version 1.9-46
